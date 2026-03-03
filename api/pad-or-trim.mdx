@@ -1,0 +1,167 @@
+---
+title: 'pad_or_trim'
+description: 'Pad or trim audio array to fixed length'
+---
+
+## Function Signature
+
+```python
+pad_or_trim(
+    array: Union[np.ndarray, torch.Tensor],
+    length: int = N_SAMPLES,
+    *,
+    axis: int = -1
+) -> Union[np.ndarray, torch.Tensor]
+```
+
+Pads or trims an audio array to a fixed length, as expected by the Whisper encoder. This ensures all audio inputs have consistent dimensions for batch processing.
+
+## Parameters
+
+<ParamField path="array" type="Union[np.ndarray, torch.Tensor]" required>
+  The input audio array to pad or trim. Can be either a NumPy array or PyTorch tensor.
+</ParamField>
+
+<ParamField path="length" type="int" default="480000">
+  The target length for the array. Defaults to `N_SAMPLES` (480000), which represents 30 seconds of audio at 16 kHz sample rate.
+</ParamField>
+
+<ParamField path="axis" type="int" default="-1">
+  The axis along which to pad or trim. Defaults to `-1` (last axis). This is a keyword-only argument.
+</ParamField>
+
+## Returns
+
+<ResponseField name="result" type="Union[np.ndarray, torch.Tensor]">
+  The padded or trimmed array with shape matching the input type. If a NumPy array was provided, returns NumPy array. If a PyTorch tensor was provided, returns PyTorch tensor.
+</ResponseField>
+
+## Example
+
+```python
+import numpy as np
+import torch
+from whisper.audio import load_audio, pad_or_trim, N_SAMPLES
+
+# Load audio (may be shorter or longer than 30 seconds)
+audio = load_audio("speech.mp3")
+print(audio.shape)  # (unknown_length,)
+
+# Pad or trim to exactly 30 seconds (480000 samples)
+audio = pad_or_trim(audio)
+print(audio.shape)  # (480000,)
+
+# Works with PyTorch tensors too
+audio_tensor = torch.from_numpy(audio)
+audio_tensor = pad_or_trim(audio_tensor)
+print(audio_tensor.shape)  # torch.Size([480000])
+
+# Custom length
+audio_10s = pad_or_trim(audio, length=16000 * 10)  # 10 seconds
+print(audio_10s.shape)  # (160000,)
+
+# Works on multi-dimensional arrays (specify axis)
+batch_audio = np.random.randn(4, 100000)  # 4 samples
+batch_audio = pad_or_trim(batch_audio, length=N_SAMPLES, axis=1)
+print(batch_audio.shape)  # (4, 480000)
+```
+
+## Behavior
+
+### When Array is Too Long (Trimming)
+
+If `array.shape[axis] > length`, the array is trimmed:
+
+- **For PyTorch tensors**: Uses `index_select` to select the first `length` elements along the specified axis.
+- **For NumPy arrays**: Uses `take` with `indices=range(length)` along the specified axis.
+
+```python
+# Example: 60 seconds of audio trimmed to 30 seconds
+audio_60s = np.random.randn(960000)  # 60 seconds
+audio_30s = pad_or_trim(audio_60s)   # Keeps first 30 seconds
+print(audio_30s.shape)  # (480000,)
+```
+
+### When Array is Too Short (Padding)
+
+If `array.shape[axis] < length`, the array is zero-padded on the right:
+
+- **For PyTorch tensors**: Uses `F.pad` to add zeros.
+- **For NumPy arrays**: Uses `np.pad` with zero padding.
+
+```python
+# Example: 10 seconds of audio padded to 30 seconds
+audio_10s = np.random.randn(160000)  # 10 seconds
+audio_30s = pad_or_trim(audio_10s)   # Pads with 320000 zeros
+print(audio_30s.shape)  # (480000,)
+```
+
+### When Array is Exact Length
+
+If `array.shape[axis] == length`, the array is returned as-is.
+
+## Audio Constants
+
+```python
+SAMPLE_RATE = 16000      # 16 kHz
+CHUNK_LENGTH = 30        # 30 seconds
+N_SAMPLES = 480000       # CHUNK_LENGTH * SAMPLE_RATE
+HOP_LENGTH = 160         # Samples between frames
+N_FRAMES = 3000          # Frames in mel spectrogram (N_SAMPLES / HOP_LENGTH)
+```
+
+## Multi-Dimensional Arrays
+
+The function works on arrays of any dimensionality:
+
+```python
+# 1D audio
+audio_1d = np.random.randn(100000)
+result = pad_or_trim(audio_1d, axis=-1)
+print(result.shape)  # (480000,)
+
+# 2D batch of audio
+audio_2d = np.random.randn(8, 200000)  # 8 samples
+result = pad_or_trim(audio_2d, axis=1)
+print(result.shape)  # (8, 480000)
+
+# 3D spectrogram-like
+audio_3d = torch.randn(2, 80, 1000)  # batch, mels, frames
+result = pad_or_trim(audio_3d, length=3000, axis=-1)
+print(result.shape)  # torch.Size([2, 80, 3000])
+```
+
+## Integration with Preprocessing Pipeline
+
+```python
+import whisper
+
+# Complete preprocessing pipeline
+model = whisper.load_model("base")
+
+# Step 1: Load audio
+audio = whisper.load_audio("speech.mp3")
+
+# Step 2: Pad or trim to 30 seconds
+audio = whisper.pad_or_trim(audio)
+
+# Step 3: Compute log-Mel spectrogram
+mel = whisper.log_mel_spectrogram(audio).to(model.device)
+
+# Step 4: Detect language or transcribe
+_, probs = model.detect_language(mel)
+result = model.decode(mel)
+```
+
+## Performance Considerations
+
+- The function preserves the input type (NumPy or PyTorch) and device (for tensors).
+- For PyTorch tensors on GPU, padding/trimming operations remain on the same device.
+- Zero-padding is memory-efficient and does not require data copying for the original samples.
+
+```python
+# GPU example
+audio = torch.randn(100000).cuda()
+audio_padded = pad_or_trim(audio)
+print(audio_padded.device)  # cuda:0
+```

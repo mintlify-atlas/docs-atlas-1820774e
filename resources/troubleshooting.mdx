@@ -1,0 +1,282 @@
+---
+title: Troubleshooting
+description: Common issues and solutions when working with Whisper
+---
+
+This page covers common issues you may encounter when installing or using Whisper, along with their solutions.
+
+## Installation Issues
+
+<Accordion title="ffmpeg not found">
+  Whisper requires the `ffmpeg` command-line tool to be installed on your system.
+
+  **Solution:** Install ffmpeg using your system's package manager:
+
+  ```bash
+  # Ubuntu or Debian
+  sudo apt update && sudo apt install ffmpeg
+
+  # Arch Linux
+  sudo pacman -S ffmpeg
+
+  # MacOS using Homebrew
+  brew install ffmpeg
+
+  # Windows using Chocolatey
+  choco install ffmpeg
+
+  # Windows using Scoop
+  scoop install ffmpeg
+  ```
+
+  After installation, verify ffmpeg is accessible:
+  ```bash
+  ffmpeg -version
+  ```
+</Accordion>
+
+<Accordion title="tiktoken installation fails">
+  Whisper depends on [tiktoken](https://github.com/openai/tiktoken) for fast tokenization. If tiktoken doesn't provide a pre-built wheel for your platform, you may need Rust installed.
+
+  **Symptoms:**
+  - Installation errors during `pip install`
+  - Messages about missing Rust compiler
+
+  **Solution:**
+
+  1. Install Rust by following the [Getting Started guide](https://www.rust-lang.org/learn/get-started)
+
+  2. Configure your PATH environment variable:
+     ```bash
+     export PATH="$HOME/.cargo/bin:$PATH"
+     ```
+
+  3. If you see `No module named 'setuptools_rust'`, install it:
+     ```bash
+     pip install setuptools-rust
+     ```
+
+  4. Retry the Whisper installation:
+     ```bash
+     pip install -U openai-whisper
+     ```
+</Accordion>
+
+<Accordion title="No module named 'setuptools_rust'">
+  This error occurs when tiktoken needs to be built from source but setuptools_rust is not installed.
+
+  **Solution:**
+  ```bash
+  pip install setuptools-rust
+  pip install -U openai-whisper
+  ```
+</Accordion>
+
+## Runtime Issues
+
+<Accordion title="CUDA out of memory / GPU memory error">
+  This occurs when the selected model requires more VRAM than your GPU has available.
+
+  **VRAM Requirements:**
+  - `tiny`, `base`: ~1 GB
+  - `small`: ~2 GB
+  - `medium`: ~5 GB
+  - `turbo`: ~6 GB
+  - `large`: ~10 GB
+
+  **Solutions:**
+
+  1. **Use a smaller model:**
+     ```python
+     # Instead of:
+     model = whisper.load_model("large")
+     
+     # Try:
+     model = whisper.load_model("small")
+     ```
+
+  2. **Use CPU instead of GPU:**
+     ```python
+     model = whisper.load_model("medium", device="cpu")
+     ```
+     Note: CPU inference will be significantly slower.
+
+  3. **Close other GPU-intensive applications** to free up VRAM
+</Accordion>
+
+<Accordion title="Model downloads fail or are very slow">
+  Model weights are downloaded from the internet on first use.
+
+  **Solutions:**
+
+  1. **Check your internet connection**
+
+  2. **Use a different download location** if your home directory has limited space:
+     ```python
+     model = whisper.load_model("medium", download_root="/path/to/custom/location")
+     ```
+
+  3. **Respect XDG_CACHE_HOME** if set:
+     ```bash
+     export XDG_CACHE_HOME="/path/to/cache"
+     ```
+</Accordion>
+
+<Accordion title="Audio file format not supported">
+  Whisper uses ffmpeg to handle audio files. Most formats are supported, but some may cause issues.
+
+  **Solution:**
+
+  Convert your audio file to a widely supported format like WAV or MP3:
+  ```bash
+  ffmpeg -i input.audio output.wav
+  ```
+
+  Then transcribe the converted file:
+  ```bash
+  whisper output.wav
+  ```
+</Accordion>
+
+<Accordion title="Empty transcription or no speech detected">
+  This can happen with audio files that contain no speech or very low-quality audio.
+
+  **Solutions:**
+
+  1. **Verify audio file** contains audible speech:
+     ```bash
+     ffplay your-audio.mp3
+     ```
+
+  2. **Check audio levels** - audio may be too quiet
+
+  3. **Try a larger model** which may be more robust to poor quality audio
+
+  4. **Specify the language** explicitly:
+     ```bash
+     whisper audio.mp3 --language English
+     ```
+</Accordion>
+
+## Accuracy Issues
+
+<Accordion title="Poor transcription quality">
+  If transcriptions are inaccurate, consider these factors:
+
+  **Solutions:**
+
+  1. **Use a larger model:**
+     ```bash
+     whisper audio.mp3 --model large
+     ```
+
+  2. **Specify the language** to avoid language detection errors:
+     ```bash
+     whisper audio.mp3 --language Japanese
+     ```
+
+  3. **Check for known limitations:**
+     - Low-resource languages may have higher error rates
+     - Background noise affects accuracy
+     - Multiple speakers or crosstalk reduce quality
+
+  4. **Improve audio quality:**
+     - Remove background noise
+     - Use higher bitrate audio
+     - Ensure clear speech without overlapping speakers
+</Accordion>
+
+<Accordion title="Hallucinations - model generates text not in audio">
+  The model may generate plausible-sounding text that wasn't actually spoken.
+
+  **Why it happens:**
+  Models are trained on large-scale noisy data and may combine language modeling with transcription.
+
+  **Mitigation strategies:**
+
+  1. **Use beam search and temperature scheduling** (already enabled by default in `transcribe()`)
+
+  2. **Use larger models** which tend to hallucinate less
+
+  3. **Enable word-level timestamps** to identify suspicious sections:
+     ```python
+     result = model.transcribe("audio.mp3", word_timestamps=True)
+     ```
+
+  4. **Be especially cautious** with low-resource languages where hallucinations are more common
+</Accordion>
+
+<Accordion title="Repetitive text in output">
+  The sequence-to-sequence architecture can sometimes generate repetitive text.
+
+  **Solutions:**
+
+  1. **Adjust temperature settings:**
+     ```python
+     result = model.transcribe("audio.mp3", temperature=0.2)
+     ```
+
+  2. **Use condition_on_previous_text parameter:**
+     ```python
+     result = model.transcribe("audio.mp3", condition_on_previous_text=False)
+     ```
+
+  3. **Try a different model size** - sometimes smaller or larger models perform better on specific audio
+</Accordion>
+
+<Accordion title="Translation not working (turbo model)">
+  The `turbo` model is not trained for translation tasks.
+
+  **Symptoms:**
+  - Using `--task translate` with `--model turbo` returns original language instead of English
+
+  **Solution:**
+
+  Use a multilingual model (`medium` or `large`) for translation:
+  ```bash
+  # Don't use turbo for translation
+  whisper japanese.wav --model medium --language Japanese --task translate
+  ```
+
+  <Warning>
+  The `turbo` model will return the original language even if `--task translate` is specified.
+  </Warning>
+</Accordion>
+
+## Platform-Specific Issues
+
+<Accordion title="Python version compatibility">
+  Whisper requires Python 3.8 or newer.
+
+  **Check your Python version:**
+  ```bash
+  python --version
+  ```
+
+  **Solution:**
+  If your Python version is too old, upgrade to Python 3.8, 3.9, 3.10, 3.11, or 3.12.
+</Accordion>
+
+<Accordion title="PyTorch compatibility issues">
+  Whisper is tested with PyTorch 1.10.1 and later versions.
+
+  **Solution:**
+  Update PyTorch to a recent version:
+  ```bash
+  pip install --upgrade torch
+  ```
+
+  For GPU support, follow [PyTorch installation instructions](https://pytorch.org/get-started/locally/) for your platform.
+</Accordion>
+
+## Getting Help
+
+If you encounter an issue not covered here:
+
+1. **Check existing issues** on [GitHub](https://github.com/openai/whisper/issues)
+2. **Search discussions** in the repository
+3. **Create a new issue** with:
+   - Your Python and PyTorch versions
+   - Full error message and stack trace
+   - Minimal code to reproduce the issue
+   - Information about your system (OS, GPU if applicable)

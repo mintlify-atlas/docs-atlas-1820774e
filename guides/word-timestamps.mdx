@@ -1,0 +1,406 @@
+---
+title: 'Word-Level Timestamps'
+description: 'Extract precise word-level timing information from audio transcriptions'
+icon: 'clock'
+---
+
+## Overview
+
+Whisper can extract word-level timestamps using cross-attention patterns and dynamic time warping (DTW). This feature enables precise synchronization between transcribed text and the original audio.
+
+<Note>
+Word-level timestamps are extracted using the cross-attention mechanism, which aligns the decoder's attention to specific audio frames for each word.
+</Note>
+
+## Basic Usage
+
+### CLI
+
+Enable word timestamps with the `--word_timestamps` flag:
+
+```bash
+whisper audio.mp3 --word_timestamps True
+```
+
+The output JSON file will include word-level timing information:
+
+```bash
+whisper audio.mp3 --word_timestamps True --output_format json
+```
+
+### Python API
+
+Set `word_timestamps=True` when calling `transcribe()`:
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+result = model.transcribe("audio.mp3", word_timestamps=True)
+
+# Access word-level timestamps
+for segment in result["segments"]:
+    for word in segment["words"]:
+        print(f"{word['word']} [{word['start']:.2f}s - {word['end']:.2f}s]")
+```
+
+## Output Format
+
+When word timestamps are enabled, each segment includes a `words` list:
+
+```python
+{
+    "id": 0,
+    "start": 0.0,
+    "end": 5.5,
+    "text": " Hello, how are you?",
+    "words": [
+        {
+            "word": " Hello,",
+            "start": 0.0,
+            "end": 0.5,
+            "probability": 0.95
+        },
+        {
+            "word": " how",
+            "start": 0.5,
+            "end": 0.8,
+            "probability": 0.98
+        },
+        {
+            "word": " are",
+            "start": 0.8,
+            "end": 1.0,
+            "probability": 0.97
+        },
+        {
+            "word": " you?",
+            "start": 1.0,
+            "end": 1.5,
+            "probability": 0.96
+        }
+    ]
+}
+```
+
+Each word entry contains:
+- `word`: The word text (including leading/trailing spaces and punctuation)
+- `start`: Start time in seconds
+- `end`: End time in seconds
+- `probability`: Average token probability for the word
+
+## Punctuation Handling
+
+Whisper automatically merges punctuation marks with adjacent words:
+
+### Prepended Punctuation
+
+These marks are merged with the **next** word:
+
+```python
+prepend_punctuations = "\"'¿([{-"
+```
+
+Example: `"Hello` → treated as one word
+
+### Appended Punctuation
+
+These marks are merged with the **previous** word:
+
+```python
+append_punctuations = "\"\'。,，!！?？:：\")]}、"
+```
+
+Example: `world!` → treated as one word
+
+### Custom Punctuation Rules
+
+```python
+result = model.transcribe(
+    "audio.mp3",
+    word_timestamps=True,
+    prepend_punctuations="\"'¿([{-",
+    append_punctuations="\"\'。,，!！?？:：\")]}、"
+)
+```
+
+## Advanced Options
+
+### Subtitle Formatting
+
+Word timestamps enable advanced subtitle formatting:
+
+```bash
+whisper video.mp4 \
+  --word_timestamps True \
+  --max_line_width 50 \
+  --max_line_count 2 \
+  --highlight_words True \
+  --output_format srt
+```
+
+<Tabs>
+  <Tab title="Line Width Control">
+    ```bash
+    --max_line_width 50
+    ```
+    Maximum number of characters per line before breaking.
+  </Tab>
+  
+  <Tab title="Line Count">
+    ```bash
+    --max_line_count 2
+    ```
+    Maximum number of lines per subtitle segment.
+  </Tab>
+  
+  <Tab title="Word Highlighting">
+    ```bash
+    --highlight_words True
+    ```
+    Underline each word as it's spoken (SRT/VTT formats).
+  </Tab>
+  
+  <Tab title="Words Per Line">
+    ```bash
+    --max_words_per_line 10
+    ```
+    Maximum words per line (only when `max_line_width` is not set).
+  </Tab>
+</Tabs>
+
+### Hallucination Detection
+
+Skip silent periods when hallucinations are detected:
+
+```bash
+whisper audio.mp3 \
+  --word_timestamps True \
+  --hallucination_silence_threshold 2.0
+```
+
+```python
+result = model.transcribe(
+    "audio.mp3",
+    word_timestamps=True,
+    hallucination_silence_threshold=2.0  # Skip 2+ seconds of silence
+)
+```
+
+This helps prevent the model from generating text during long silent periods.
+
+## Use Cases
+
+### 1. Precise Subtitle Generation
+
+```python
+import whisper
+
+def generate_word_level_subtitles(audio_file: str, output_file: str):
+    model = whisper.load_model("turbo")
+    result = model.transcribe(audio_file, word_timestamps=True)
+    
+    with open(output_file, "w", encoding="utf-8") as f:
+        subtitle_index = 1
+        for segment in result["segments"]:
+            for word in segment["words"]:
+                start = format_timestamp(word["start"])
+                end = format_timestamp(word["end"])
+                text = word["word"].strip()
+                
+                f.write(f"{subtitle_index}\n")
+                f.write(f"{start} --> {end}\n")
+                f.write(f"{text}\n\n")
+                subtitle_index += 1
+
+def format_timestamp(seconds: float) -> str:
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int((seconds % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+generate_word_level_subtitles("video.mp4", "subtitles.srt")
+```
+
+### 2. Audio-Text Alignment for Editing
+
+```python
+import whisper
+
+def find_word_position(audio_file: str, search_word: str):
+    model = whisper.load_model("turbo")
+    result = model.transcribe(audio_file, word_timestamps=True)
+    
+    matches = []
+    for segment in result["segments"]:
+        for word in segment["words"]:
+            if search_word.lower() in word["word"].lower():
+                matches.append({
+                    "word": word["word"],
+                    "start": word["start"],
+                    "end": word["end"],
+                    "probability": word["probability"]
+                })
+    
+    return matches
+
+# Find all instances of "artificial intelligence"
+matches = find_word_position("podcast.mp3", "artificial")
+for match in matches:
+    print(f"{match['word']} at {match['start']:.2f}s (confidence: {match['probability']:.2%})")
+```
+
+### 3. Karaoke-Style Lyrics Display
+
+```python
+import whisper
+import time
+import os
+
+def display_lyrics_realtime(audio_file: str):
+    model = whisper.load_model("turbo")
+    result = model.transcribe(audio_file, word_timestamps=True)
+    
+    # Flatten all words
+    all_words = []
+    for segment in result["segments"]:
+        all_words.extend(segment["words"])
+    
+    print("Starting playback...\n")
+    start_time = time.time()
+    
+    for word in all_words:
+        # Wait until word should be displayed
+        while time.time() - start_time < word["start"]:
+            time.sleep(0.01)
+        
+        # Display word
+        print(word["word"], end="", flush=True)
+        
+        # Optional: clear after word ends
+        # time.sleep(word["end"] - word["start"])
+    
+    print("\n\nPlayback complete!")
+
+# Note: This doesn't actually play audio, just simulates timing
+# Combine with an audio player for real karaoke
+```
+
+### 4. Speech Segmentation and Analysis
+
+```python
+import whisper
+import numpy as np
+
+def analyze_speech_rate(audio_file: str):
+    model = whisper.load_model("turbo")
+    result = model.transcribe(audio_file, word_timestamps=True)
+    
+    word_durations = []
+    for segment in result["segments"]:
+        for word in segment["words"]:
+            duration = word["end"] - word["start"]
+            word_count = len(word["word"].strip().split())
+            if word_count > 0:
+                word_durations.append(duration / word_count)
+    
+    if word_durations:
+        avg_duration = np.mean(word_durations)
+        words_per_minute = 60 / avg_duration if avg_duration > 0 else 0
+        
+        print(f"Average word duration: {avg_duration:.3f}s")
+        print(f"Estimated speech rate: {words_per_minute:.1f} words/minute")
+    
+    return word_durations
+
+analyze_speech_rate("speech.mp3")
+```
+
+### 5. Create Clickable Transcript
+
+```python
+import whisper
+import json
+
+def create_interactive_transcript(audio_file: str, output_html: str):
+    model = whisper.load_model("turbo")
+    result = model.transcribe(audio_file, word_timestamps=True)
+    
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Interactive Transcript</title>
+        <style>
+            .word { cursor: pointer; }
+            .word:hover { background-color: yellow; }
+        </style>
+    </head>
+    <body>
+        <audio id="audio" controls>
+            <source src="{audio_file}" type="audio/mpeg">
+        </audio>
+        <div id="transcript">
+    """.format(audio_file=audio_file)
+    
+    for segment in result["segments"]:
+        for word in segment["words"]:
+            html += f'<span class="word" onclick="seek({word["start"]})">{word["word"]}</span>'
+    
+    html += """
+        </div>
+        <script>
+            function seek(time) {
+                document.getElementById('audio').currentTime = time;
+                document.getElementById('audio').play();
+            }
+        </script>
+    </body>
+    </html>
+    """
+    
+    with open(output_html, "w", encoding="utf-8") as f:
+        f.write(html)
+
+create_interactive_transcript("podcast.mp3", "transcript.html")
+```
+
+## Limitations and Considerations
+
+<Warning>
+Word-level timestamps on **translations** may not be reliable, as the timing is based on the source language but the text is in English.
+</Warning>
+
+### Accuracy Factors
+
+- Word timestamps are more accurate for clear speech with minimal background noise
+- Fast speech or overlapping speakers can reduce accuracy
+- The `probability` field indicates confidence for each word
+- Very short words (< 0.133s) or very long words (> 2.0s) may indicate alignment issues
+
+### Performance Impact
+
+Enabling word timestamps:
+- Increases processing time (requires cross-attention analysis and DTW)
+- Uses additional memory for storing alignment data
+- Is most noticeable on longer audio files
+
+### Best Practices
+
+1. Use higher-quality models (`medium`, `large`) for better timestamp accuracy
+2. Filter out low-probability words for critical applications
+3. Validate timestamps against actual audio for important use cases
+4. Consider segment-level timestamps for less critical applications
+
+```python
+# Filter low-confidence words
+result = model.transcribe("audio.mp3", word_timestamps=True)
+
+for segment in result["segments"]:
+    high_confidence_words = [
+        word for word in segment["words"]
+        if word["probability"] > 0.8
+    ]
+    print([w["word"] for w in high_confidence_words])
+```

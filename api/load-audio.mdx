@@ -1,0 +1,80 @@
+---
+title: 'load_audio'
+description: 'Load an audio file and convert to mono waveform with resampling'
+---
+
+## Function Signature
+
+```python
+load_audio(file: str, sr: int = SAMPLE_RATE) -> np.ndarray
+```
+
+Opens an audio file and reads it as a mono waveform, resampling as necessary. This function uses FFmpeg to decode audio while down-mixing and resampling.
+
+## Parameters
+
+<ParamField path="file" type="str" required>
+  The path to the audio file to open. Supports any audio format that FFmpeg can decode.
+</ParamField>
+
+<ParamField path="sr" type="int" default="16000">
+  The sample rate to resample the audio if necessary. Defaults to `SAMPLE_RATE` (16000 Hz).
+</ParamField>
+
+## Returns
+
+<ResponseField name="waveform" type="np.ndarray">
+  A NumPy array containing the audio waveform in `float32` dtype. Values are normalized to the range [-1.0, 1.0].
+</ResponseField>
+
+## Example
+
+```python
+import whisper
+from whisper.audio import load_audio
+
+# Load audio file at default 16kHz sample rate
+audio = load_audio("speech.mp3")
+
+# Load audio at custom sample rate
+audio = load_audio("speech.wav", sr=22050)
+
+# Audio is returned as normalized float32 array
+print(audio.dtype)  # float32
+print(audio.min(), audio.max())  # Values in range [-1.0, 1.0]
+```
+
+## Implementation Details
+
+### FFmpeg Dependency
+This function requires the FFmpeg CLI to be available in your system PATH. It launches a subprocess with the following operations:
+- Decodes the input audio file
+- Down-mixes to mono (`-ac 1`)
+- Resamples to the specified sample rate
+- Outputs as 16-bit PCM (`-f s16le`)
+
+### Normalization
+The raw 16-bit PCM output is converted to float32 and normalized by dividing by 32768.0, mapping the integer range [-32768, 32767] to the float range [-1.0, 1.0].
+
+## Audio Constants
+
+The default sample rate and other audio constants used in Whisper:
+
+```python
+SAMPLE_RATE = 16000  # 16 kHz sample rate
+N_FFT = 400          # FFT window size
+HOP_LENGTH = 160     # Number of samples between STFT columns
+CHUNK_LENGTH = 30    # 30-second chunks
+N_SAMPLES = 480000   # Samples in a 30-second chunk (CHUNK_LENGTH * SAMPLE_RATE)
+```
+
+## Error Handling
+
+```python
+try:
+    audio = load_audio("invalid_file.mp3")
+except RuntimeError as e:
+    print(f"Failed to load audio: {e}")
+```
+
+Raises `RuntimeError` if FFmpeg fails to decode the audio file, with the stderr output from FFmpeg included in the error message.

@@ -1,0 +1,88 @@
+---
+title: Performance
+description: Performance metrics, speed comparisons, and accuracy tradeoffs for Whisper models
+---
+
+## Model Sizes and Speed
+
+Whisper offers six model sizes with different speed and accuracy tradeoffs. Below are the available models and their approximate memory requirements and inference speed relative to the large model.
+
+<Note>
+The relative speeds are measured by transcribing English speech on an A100 GPU. Real-world speed may vary significantly depending on factors including the language, speaking speed, and available hardware.
+</Note>
+
+| Size   | Parameters | English-only | Multilingual | Required VRAM | Relative Speed |
+|--------|------------|--------------|--------------|---------------|----------------|
+| tiny   | 39 M       | `tiny.en`    | `tiny`       | ~1 GB         | ~10x           |
+| base   | 74 M       | `base.en`    | `base`       | ~1 GB         | ~7x            |
+| small  | 244 M      | `small.en`   | `small`      | ~2 GB         | ~4x            |
+| medium | 769 M      | `medium.en`  | `medium`     | ~5 GB         | ~2x            |
+| large  | 1550 M     | N/A          | `large`      | ~10 GB        | 1x             |
+| turbo  | 809 M      | N/A          | `turbo`      | ~6 GB         | ~8x            |
+
+### Model Selection Guidance
+
+**English-only models** (`.en` suffix) tend to perform better for English applications, especially for `tiny.en` and `base.en`. The performance difference becomes less significant for `small.en` and `medium.en`.
+
+**Turbo model** is an optimized version of `large-v3` that offers faster transcription speed with minimal degradation in accuracy. Note that the turbo model is not trained for translation tasks.
+
+## Accuracy by Language
+
+Whisper's performance varies widely depending on the language. The chart below shows a performance breakdown of `large-v3` and `large-v2` models by language, using WER (Word Error Rates) or CER (Character Error Rates, shown in *italic*).
+
+<Note>
+Metrics are evaluated on the Common Voice 15 and Fleurs datasets. Lower WER/CER values indicate better performance.
+</Note>
+
+![WER breakdown by language](https://github.com/openai/whisper/assets/266841/f4619d66-1058-4005-8f67-a9d811b77c62)
+
+### Additional Metrics
+
+For comprehensive performance data:
+- **WER/CER metrics** for all models and datasets: See Appendix D.1, D.2, and D.4 of [the paper](https://arxiv.org/abs/2212.04356)
+- **Translation BLEU scores**: See Appendix D.3 of the paper
+
+## Performance Tradeoffs
+
+### Speed vs Accuracy
+
+- **Fastest**: `tiny` and `turbo` models provide the quickest transcription but with lower accuracy
+- **Balanced**: `small` and `medium` models offer good performance for most use cases
+- **Most Accurate**: `large` models provide the best accuracy but require more VRAM and processing time
+
+### VRAM Requirements
+
+Minimum VRAM needed for each model:
+- **1 GB**: Sufficient for `tiny` and `base` models
+- **2 GB**: Required for `small` model
+- **5 GB**: Required for `medium` model
+- **6 GB**: Required for `turbo` model
+- **10 GB**: Required for `large` model
+
+<Warning>
+Ensure your GPU has sufficient VRAM before selecting a model. Out-of-memory errors will occur if VRAM is insufficient.
+</Warning>
+
+## Language-Specific Performance
+
+Performance is directly correlated with the amount of training data available for each language:
+
+- **High-resource languages** (e.g., English, Spanish, French): Best performance with lower WER
+- **Medium-resource languages**: Moderate performance
+- **Low-resource languages**: Higher WER and potential accuracy issues
+
+### Training Data Distribution
+
+The models are trained on 680,000 hours of audio:
+- **65%** (438,000 hours): English audio with English transcripts
+- **18%** (126,000 hours): Non-English audio with English transcripts (translation)
+- **17%** (117,000 hours): Non-English audio with native transcripts (98 languages)
+
+## Robustness
+
+Whisper models exhibit improved robustness compared to many existing ASR systems:
+
+- **Accents**: Better handling of diverse accents
+- **Background noise**: Improved performance in noisy environments
+- **Technical language**: Better recognition of domain-specific terminology
+- **Zero-shot translation**: Can translate from multiple languages into English without specific fine-tuning

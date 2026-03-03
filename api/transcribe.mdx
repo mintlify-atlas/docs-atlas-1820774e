@@ -1,0 +1,276 @@
+---
+title: 'transcribe()'
+description: 'Transcribe an audio file using Whisper'
+---
+
+## Function Signature
+
+```python
+def transcribe(
+    model: "Whisper",
+    audio: Union[str, np.ndarray, torch.Tensor],
+    *,
+    verbose: Optional[bool] = None,
+    temperature: Union[float, Tuple[float, ...]] = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+    compression_ratio_threshold: Optional[float] = 2.4,
+    logprob_threshold: Optional[float] = -1.0,
+    no_speech_threshold: Optional[float] = 0.6,
+    condition_on_previous_text: bool = True,
+    initial_prompt: Optional[str] = None,
+    carry_initial_prompt: bool = False,
+    word_timestamps: bool = False,
+    prepend_punctuations: str = "\"'"¿([{-",
+    append_punctuations: str = "\"'.。,，!！?？:：\")]}、",
+    clip_timestamps: Union[str, List[float]] = "0",
+    hallucination_silence_threshold: Optional[float] = None,
+    **decode_options,
+)
+```
+
+## Parameters
+
+<ParamField path="model" type="Whisper" required>
+  The Whisper model instance returned by `load_model()`.
+</ParamField>
+
+<ParamField path="audio" type="Union[str, np.ndarray, torch.Tensor]" required>
+  The path to the audio file to open, or the audio waveform as a NumPy array or PyTorch tensor.
+  
+  - **File path**: String path to audio file (supports most formats via ffmpeg)
+  - **NumPy array**: Float32 array with values in [-1.0, 1.0], sampled at 16kHz
+  - **PyTorch Tensor**: Float32 tensor with values in [-1.0, 1.0], sampled at 16kHz
+</ParamField>
+
+<ParamField path="verbose" type="Optional[bool]" default="None">
+  Controls console output during transcription:
+  - `True`: Display all details including timestamps and text as decoded
+  - `False`: Display minimal details (progress bar only)
+  - `None`: No display output
+</ParamField>
+
+<ParamField path="temperature" type="Union[float, Tuple[float, ...]]" default="(0.0, 0.2, 0.4, 0.6, 0.8, 1.0)">
+  Temperature for sampling. Can be a single float or tuple of temperatures.
+  
+  When a tuple is provided, temperatures are tried sequentially upon failures determined by `compression_ratio_threshold` or `logprob_threshold`.
+  
+  - `0.0`: Greedy decoding (deterministic, most accurate)
+  - `> 0.0`: Sampling (more creative, less deterministic)
+</ParamField>
+
+<ParamField path="compression_ratio_threshold" type="Optional[float]" default="2.4">
+  If the gzip compression ratio is above this value, treat the decoding as failed and try next temperature.
+  
+  High compression ratios indicate repetitive text, suggesting decoding failure.
+</ParamField>
+
+<ParamField path="logprob_threshold" type="Optional[float]" default="-1.0">
+  If the average log probability over sampled tokens is below this value, treat the decoding as failed.
+  
+  Low log probabilities indicate low confidence in the transcription.
+</ParamField>
+
+<ParamField path="no_speech_threshold" type="Optional[float]" default="0.6">
+  If the no_speech probability is higher than this value AND the average log probability is below `logprob_threshold`, consider the segment as silent.
+  
+  This helps skip segments with no speech activity.
+</ParamField>
+
+<ParamField path="condition_on_previous_text" type="bool" default="True">
+  If `True`, provide the previous output of the model as a prompt for the next window.
+  
+  - **Advantage**: More consistent text across windows
+  - **Disadvantage**: Model may get stuck in failure loops (repetition, timestamps out of sync)
+  
+  Set to `False` if experiencing repetition issues.
+</ParamField>
+
+<ParamField path="initial_prompt" type="Optional[str]" default="None">
+  Optional text to provide as a prompt for the first window.
+  
+  Use cases:
+  - Provide context or domain-specific vocabulary
+  - Guide spelling of proper nouns or technical terms
+  - Set the style or format of transcription
+  
+  Example: `"This is a medical lecture about cardiology."`
+</ParamField>
+
+<ParamField path="carry_initial_prompt" type="bool" default="False">
+  If `True`, prepend `initial_prompt` to the prompt of each internal `decode()` call.
+  
+  - When `True`: Initial prompt persists throughout entire transcription
+  - When `False`: Initial prompt only affects first window
+  
+  If there's not enough context space, the prompt is left-sliced to fit.
+</ParamField>
+
+<ParamField path="word_timestamps" type="bool" default="False">
+  Extract word-level timestamps using cross-attention pattern and dynamic time warping.
+  
+  When `True`, each segment includes a `words` field with per-word timing.
+  
+  **Note**: Adds computational overhead. Word-level timestamps on translations may not be reliable.
+</ParamField>
+
+<ParamField path="prepend_punctuations" type="str" default='&quot;&apos;&quot;¿([&#123;-'>
+  If `word_timestamps` is `True`, merge these punctuation symbols with the next word.
+  
+  Example: Opening quotes, brackets are merged forward.
+</ParamField>
+
+<ParamField path="append_punctuations" type="str" default='&quot;&apos;.。,，!！?？:：&quot;)&#93;&#125;、'>
+  If `word_timestamps` is `True`, merge these punctuation symbols with the previous word.
+  
+  Example: Closing quotes, periods are merged backward.
+</ParamField>
+
+<ParamField path="clip_timestamps" type="Union[str, List[float]]" default="0">
+  Comma-separated list or list of floats specifying start,end,start,end,... timestamps (in seconds) of clips to process.
+  
+  The last end timestamp defaults to the end of the file.
+  
+  Examples:
+  - `"0,30,60,90"`: Process 0-30s and 60-90s
+  - `[10.5, 45.2]`: Process 10.5-45.2s
+</ParamField>
+
+<ParamField path="hallucination_silence_threshold" type="Optional[float]" default="None">
+  When `word_timestamps` is `True`, skip silent periods longer than this threshold (in seconds) when a possible hallucination is detected.
+  
+  Helps prevent the model from generating text during silence.
+</ParamField>
+
+<ParamField path="decode_options" type="dict">
+  Additional keyword arguments to construct `DecodingOptions` instances. Common options:
+  
+  - `language` (str): Language code (e.g., `"en"`, `"fr"`). Auto-detected if `None`.
+  - `task` (str): Either `"transcribe"` (default) or `"translate"` (to English)
+  - `fp16` (bool): Use FP16 for inference. Default `True` on CUDA, `False` on CPU.
+  - `beam_size` (int): Number of beams in beam search (only when `temperature=0`)
+  - `best_of` (int): Number of candidates when sampling with non-zero temperature
+  - `patience` (float): Patience value for beam search
+  - `length_penalty` (float): Length penalty coefficient (alpha)
+  - `suppress_tokens` (str): Comma-separated token IDs to suppress
+</ParamField>
+
+## Returns
+
+<ResponseField name="result" type="dict">
+  A dictionary containing:
+  
+  <Expandable title="Dictionary structure">
+    <ResponseField name="text" type="str">
+      The complete transcribed text from the audio file.
+    </ResponseField>
+    
+    <ResponseField name="segments" type="List[dict]">
+      List of segment-level details. Each segment contains:
+      - `id` (int): Segment identifier
+      - `seek` (int): Seek position in frames
+      - `start` (float): Start time in seconds
+      - `end` (float): End time in seconds
+      - `text` (str): Transcribed text for this segment
+      - `tokens` (List[int]): Token IDs for this segment
+      - `temperature` (float): Temperature used for this segment
+      - `avg_logprob` (float): Average log probability
+      - `compression_ratio` (float): Compression ratio
+      - `no_speech_prob` (float): No-speech probability
+      - `words` (List[dict], optional): Word-level timestamps (if `word_timestamps=True`)
+    </ResponseField>
+    
+    <ResponseField name="language" type="str">
+      The detected or specified language code (e.g., `"en"`, `"es"`, `"fr"`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```python
+import whisper
+
+model = whisper.load_model("base")
+
+# Basic transcription
+result = model.transcribe("audio.mp3")
+print(result["text"])
+
+# Transcription with language specification
+result = model.transcribe("audio.mp3", language="en")
+
+# Translation to English
+result = model.transcribe("spanish.mp3", task="translate")
+
+# With word-level timestamps
+result = model.transcribe("audio.mp3", word_timestamps=True)
+for segment in result["segments"]:
+    for word in segment.get("words", []):
+        print(f"[{word['start']:.2f}s -> {word['end']:.2f}s] {word['word']}")
+
+# Process only specific clips
+result = model.transcribe("long_audio.mp3", clip_timestamps="30,90,120,180")
+
+# With initial prompt for better accuracy
+result = model.transcribe(
+    "medical_lecture.mp3",
+    initial_prompt="Medical terms: cardiology, stenosis, arrhythmia"
+)
+
+# Disable conditioning on previous text to avoid repetition
+result = model.transcribe("audio.mp3", condition_on_previous_text=False)
+
+# Using NumPy array input
+import numpy as np
+audio_array = np.random.randn(16000 * 10).astype(np.float32)  # 10 seconds
+result = model.transcribe(audio_array)
+```
+
+## Notes
+
+### Language Detection
+
+If `language` is not specified in `decode_options`:
+- Multilingual models automatically detect language from the first 30 seconds
+- English-only models (`.en`) always use English
+- Detection results are shown when `verbose=True`
+
+### Temperature Fallback Strategy
+
+When multiple temperatures are provided (default behavior):
+1. Starts with lowest temperature (greedy decoding)
+2. If decoding fails quality checks, tries next temperature
+3. Continues until acceptable result or all temperatures exhausted
+
+Quality checks:
+- Compression ratio below threshold
+- Average log probability above threshold
+- No-speech detection
+
+### Performance Considerations
+
+- **30-second chunks**: Audio is processed in 30-second windows
+- **Word timestamps**: Adds ~20-30% processing time
+- **Beam search**: Slower than greedy but more accurate (use with `temperature=0, beam_size=5`)
+- **FP16**: 2x faster on CUDA, not supported on CPU
+
+### Hallucination Detection
+
+When `word_timestamps=True` and `hallucination_silence_threshold` is set:
+- Detects anomalous words (very short/long duration, low probability)
+- Skips segments surrounded by silence that appear to be hallucinations
+- Helps prevent fabricated text in silent portions
+
+### Task Types
+
+- `task="transcribe"`: Speech-to-text in original language (X→X)
+- `task="translate"`: Speech-to-text translated to English (X→EN)
+
+### Common Issues
+
+**Repetition loops**: Set `condition_on_previous_text=False`
+
+**Poor quality on specific domains**: Use `initial_prompt` with relevant vocabulary
+
+**Timestamps out of sync**: Try `word_timestamps=True` for better alignment
+
+**Processing too slow**: Use smaller model, disable word timestamps, or use FP16 on GPU

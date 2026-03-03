@@ -1,0 +1,120 @@
+---
+title: Introduction
+description: Robust speech recognition via large-scale weak supervision
+---
+
+<img
+  className="block dark:hidden"
+  src="https://raw.githubusercontent.com/openai/whisper/main/approach.png"
+  alt="Whisper Approach"
+/>
+<img
+  className="hidden dark:block"
+  src="https://raw.githubusercontent.com/openai/whisper/main/approach.png"
+  alt="Whisper Approach"
+/>
+
+## What is Whisper?
+
+Whisper is a general-purpose speech recognition model developed by OpenAI. It is trained on a large dataset of diverse audio and is a multitasking model that can perform multilingual speech recognition, speech translation, and language identification.
+
+A Transformer sequence-to-sequence model is trained on various speech processing tasks, including multilingual speech recognition, speech translation, spoken language identification, and voice activity detection. These tasks are jointly represented as a sequence of tokens to be predicted by the decoder, allowing a single model to replace many stages of a traditional speech-processing pipeline.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Multilingual Recognition"
+    icon="globe"
+  >
+    Transcribe speech in 99+ languages with high accuracy across diverse accents and dialects
+  </Card>
+  <Card
+    title="Speech Translation"
+    icon="language"
+  >
+    Translate speech from any supported language directly into English text
+  </Card>
+  <Card
+    title="Multiple Model Sizes"
+    icon="layer-group"
+  >
+    Choose from 6 model sizes (tiny to turbo) to balance speed and accuracy for your use case
+  </Card>
+  <Card
+    title="Simple API"
+    icon="code"
+  >
+    Easy-to-use Python API and command-line interface for quick integration
+  </Card>
+</CardGroup>
+
+## Available Models
+
+Whisper offers six model sizes with varying speed and accuracy tradeoffs:
+
+| Size   | Parameters | English-only | Multilingual | Required VRAM | Relative Speed |
+|--------|------------|--------------|--------------|---------------|----------------|
+| tiny   | 39 M       | `tiny.en`    | `tiny`       | ~1 GB         | ~10x           |
+| base   | 74 M       | `base.en`    | `base`       | ~1 GB         | ~7x            |
+| small  | 244 M      | `small.en`   | `small`      | ~2 GB         | ~4x            |
+| medium | 769 M      | `medium.en`  | `medium`     | ~5 GB         | ~2x            |
+| large  | 1550 M     | N/A          | `large`      | ~10 GB        | 1x             |
+| turbo  | 809 M      | N/A          | `turbo`      | ~6 GB         | ~8x            |
+
+<Note>
+  The `.en` models for English-only applications tend to perform better, especially for the `tiny.en` and `base.en` models. The `turbo` model is an optimized version of `large-v3` that offers faster transcription speed with minimal degradation in accuracy.
+</Note>
+
+<Warning>
+  The `turbo` model is not trained for translation tasks. If you need to translate non-English speech into English, use one of the multilingual models (`tiny`, `base`, `small`, `medium`, `large`) instead.
+</Warning>
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install Whisper and its dependencies on your system
+  </Card>
+  <Card
+    title="Quickstart"
+    icon="bolt"
+    href="/quickstart"
+  >
+    Start transcribing audio in minutes with CLI and Python examples
+  </Card>
+</CardGroup>
+
+## Resources
+
+<CardGroup cols={3}>
+  <Card
+    title="Research Paper"
+    icon="file-lines"
+    href="https://arxiv.org/abs/2212.04356"
+  >
+    Read the technical paper on arXiv
+  </Card>
+  <Card
+    title="Blog Post"
+    icon="newspaper"
+    href="https://openai.com/blog/whisper"
+  >
+    Learn more from the official OpenAI blog
+  </Card>
+  <Card
+    title="Model Card"
+    icon="id-card"
+    href="https://github.com/openai/whisper/blob/main/model-card.md"
+  >
+    View detailed model specifications
+  </Card>
+</CardGroup>
+
+## Python Compatibility
+
+Whisper is compatible with Python 3.8-3.13 and recent PyTorch versions. The codebase was developed and tested with Python 3.9.9 and PyTorch 1.10.1.

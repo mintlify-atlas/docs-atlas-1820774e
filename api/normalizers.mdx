@@ -1,0 +1,530 @@
+---
+title: Text Normalizers
+description: Text normalization utilities for preprocessing Whisper transcriptions
+---
+
+The normalizers module provides utilities for normalizing and standardizing text output from Whisper models. These tools help compare transcriptions by removing formatting differences, converting numbers, and standardizing spellings.
+
+## BasicTextNormalizer
+
+Basic text normalizer that lowercases text, removes brackets/parentheses content, and optionally removes diacritics.
+
+```python
+from whisper.normalizers import BasicTextNormalizer
+
+normalizer = BasicTextNormalizer()
+text = normalizer("HELLO [background noise] (speaker coughs) café")
+print(text)  # "hello café"
+```
+
+### Initialization
+
+<ParamField path="remove_diacritics" type="bool" default="False">
+  If True, removes diacritical marks from characters (e.g., "café" → "cafe")
+</ParamField>
+
+<ParamField path="split_letters" type="bool" default="False">
+  If True, splits text into individual Unicode grapheme clusters (useful for character-level analysis)
+</ParamField>
+
+### Normalization Process
+
+The `BasicTextNormalizer` performs the following operations:
+
+1. Converts text to lowercase
+2. Removes content within angle brackets or square brackets: `<...>`, `[...]`
+3. Removes content within parentheses: `(...)`
+4. Optionally removes diacritics and symbols (if `remove_diacritics=True`)
+5. Optionally splits into individual letters/graphemes (if `split_letters=True`)
+6. Collapses multiple whitespace characters into single spaces
+
+### Examples
+
+#### Basic Usage
+
+```python
+from whisper.normalizers import BasicTextNormalizer
+
+normalizer = BasicTextNormalizer()
+
+# Remove brackets and parentheses
+text = normalizer("Hello [music] world (coughs)")
+print(text)  # "hello  world"
+
+# Lowercase conversion
+text = normalizer("The QUICK Brown Fox")
+print(text)  # "the quick brown fox"
+
+# Preserve diacritics by default
+text = normalizer("café résumé naïve")
+print(text)  # "café résumé naïve"
+```
+
+#### With Diacritics Removal
+
+```python
+from whisper.normalizers import BasicTextNormalizer
+
+normalizer = BasicTextNormalizer(remove_diacritics=True)
+
+# Remove diacritics
+text = normalizer("café résumé naïve")
+print(text)  # "cafe resume naive"
+
+# Handle various diacritical marks
+text = normalizer("Zürich Österreich Köln")
+print(text)  # "zurich osterreich koln"
+
+# Special character mappings
+text = normalizer("Schloß Æsop œuvre ø")
+print(text)  # "schloss aesop oeuvre o"
+```
+
+#### With Letter Splitting
+
+```python
+from whisper.normalizers import BasicTextNormalizer
+
+normalizer = BasicTextNormalizer(split_letters=True)
+
+# Split into individual characters
+text = normalizer("Hello")
+print(text)  # "h e l l o"
+
+# Works with Unicode grapheme clusters
+text = normalizer("café")
+print(text)  # "c a f é"
+```
+
+## EnglishTextNormalizer
+
+Comprehensive English text normalizer that expands contractions, standardizes numbers, and normalizes spellings.
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+text = normalizer("I can't believe it's twenty-one dollars!")
+print(text)  # "i can not believe it is 21 dollars"
+```
+
+### Normalization Process
+
+The `EnglishTextNormalizer` performs extensive normalization:
+
+1. Converts text to lowercase
+2. Removes content in brackets/parentheses: `<...>`, `[...]`, `(...)`
+3. Removes filler words: "hmm", "mm", "mhm", "uh", "um"
+4. Expands contractions: "can't" → "can not", "won't" → "will not"
+5. Expands titles and abbreviations: "Mr." → "mister", "Dr." → "doctor"
+6. Standardizes numbers: converts spelled-out numbers to digits
+7. Normalizes spellings: British to American English
+8. Removes symbols and punctuation (keeping numeric symbols during processing)
+9. Collapses whitespace
+
+### Examples
+
+#### Contraction Expansion
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# Common contractions
+text = normalizer("I can't believe you won't come")
+print(text)  # "i can not believe you will not come"
+
+# Informal contractions
+text = normalizer("I'm gonna wanna get some")
+print(text)  # "i am going to want to get some"
+
+# Perfect tenses
+text = normalizer("He'd been there, she's done it")
+print(text)  # "he had been there she has done it"
+```
+
+#### Title and Abbreviation Expansion
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# Titles
+text = normalizer("Mr. Smith and Mrs. Jones")
+print(text)  # "mister smith and missus jones"
+
+# Professional titles
+text = normalizer("Dr. Brown, Prof. White")
+print(text)  # "doctor brown professor white"
+
+# Military and government titles
+text = normalizer("Gen. Lee, Sen. Adams, Rep. Carter")
+print(text)  # "general lee senator adams representative carter"
+```
+
+#### Number Normalization
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# Spelled-out numbers to digits
+text = normalizer("twenty-one")
+print(text)  # "21"
+
+text = normalizer("one hundred and fifty-three")
+print(text)  # "153"
+
+text = normalizer("three million two hundred thousand")
+print(text)  # "3200000"
+
+# Currency
+text = normalizer("twenty dollars and fifty cents")
+print(text)  # "$20.50"
+
+text = normalizer("five euros")
+print(text)  # "5 euros"
+
+# Ordinals
+text = normalizer("the twenty-first century")
+print(text)  # "the 21st century"
+
+# Percentages
+text = normalizer("fifty percent")
+print(text)  # "50%"
+```
+
+#### Spelling Normalization
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# British to American English
+text = normalizer("colour favour honour")
+print(text)  # "color favor honor"
+
+text = normalizer("organise recognise")
+print(text)  # "organize recognize"
+
+text = normalizer("centre theatre")
+print(text)  # "center theater"
+```
+
+#### Complete Example
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# Complex sentence with multiple normalizations
+text = normalizer(
+    "Mr. Smith said he'd invested twenty-three thousand, "
+    "five hundred dollars in the 1990s. [applause] "
+    "That's approximately fifty-two percent of his income!"
+)
+print(text)
+# "mister smith said he had invested 23500 dollars in the 1990s that is approximately 52% of his income"
+```
+
+## EnglishNumberNormalizer
+
+Specialized normalizer for converting spelled-out numbers to Arabic numerals.
+
+```python
+from whisper.normalizers.english import EnglishNumberNormalizer
+
+normalizer = EnglishNumberNormalizer()
+text = normalizer("twenty-one")
+print(text)  # "21"
+```
+
+### Features
+
+- Converts spelled-out numbers to digits
+- Removes commas from numbers
+- Preserves suffixes: "1960s", "21st", "32nd"
+- Handles currency symbols: "$20 million" → "20000000 dollars"
+- Interprets successive single digits: "one oh one" → "101"
+- Supports special patterns: "double three" → "33", "triple five" → "555"
+
+### Examples
+
+#### Basic Number Conversion
+
+```python
+from whisper.normalizers.english import EnglishNumberNormalizer
+
+normalizer = EnglishNumberNormalizer()
+
+# Simple numbers
+print(normalizer("one"))          # "one" (literal)
+print(normalizer("twenty"))       # "20"
+print(normalizer("ninety-nine"))  # "99"
+
+# Large numbers
+print(normalizer("one thousand"))              # "1000"
+print(normalizer("five million"))              # "5000000"
+print(normalizer("two billion"))               # "2000000000"
+print(normalizer("three point five million"))  # "3500000"
+```
+
+#### Ordinals and Cardinals
+
+```python
+from whisper.normalizers.english import EnglishNumberNormalizer
+
+normalizer = EnglishNumberNormalizer()
+
+# Ordinal numbers
+print(normalizer("first"))        # "1st"
+print(normalizer("second"))       # "2nd"
+print(normalizer("third"))        # "3rd"
+print(normalizer("twenty-first")) # "21st"
+print(normalizer("hundredth"))    # "100th"
+
+# Plural forms
+print(normalizer("twenties"))     # "20s"
+print(normalizer("hundreds"))     # "100s"
+print(normalizer("thousands"))    # "1000s"
+```
+
+#### Currency and Symbols
+
+```python
+from whisper.normalizers.english import EnglishNumberNormalizer
+
+normalizer = EnglishNumberNormalizer()
+
+# Dollar amounts
+print(normalizer("twenty dollars"))              # "$20"
+print(normalizer("fifty cents"))                 # "¢50"
+print(normalizer("twenty dollars and fifty cents"))  # "$20.50"
+
+# Other currencies
+print(normalizer("ten euros"))   # "€10"
+print(normalizer("five pounds"))  # "£5"
+
+# Percentages
+print(normalizer("fifty percent"))      # "50%"
+print(normalizer("ninety-nine percent")) # "99%"
+```
+
+#### Special Patterns
+
+```python
+from whisper.normalizers.english import EnglishNumberNormalizer
+
+normalizer = EnglishNumberNormalizer()
+
+# Phone numbers and codes
+print(normalizer("one oh one"))          # "101"
+print(normalizer("nine one one"))        # "911"
+print(normalizer("double zero seven"))   # "007"
+
+# Repetition patterns
+print(normalizer("double three"))   # "33"
+print(normalizer("triple five"))    # "555"
+
+# Decimal numbers
+print(normalizer("three point one four"))  # "3.14"
+print(normalizer("zero point five"))       # "0.5"
+
+# Fractions as decimals
+print(normalizer("five and a half"))       # "5.5"
+print(normalizer("ten and a half"))        # "10.5"
+```
+
+#### Signs and Prefixes
+
+```python
+from whisper.normalizers.english import EnglishNumberNormalizer
+
+normalizer = EnglishNumberNormalizer()
+
+# Positive/negative
+print(normalizer("minus five"))      # "-5"
+print(normalizer("negative ten"))    # "-10"
+print(normalizer("plus three"))      # "+3"
+print(normalizer("positive seven"))  # "+7"
+```
+
+## EnglishSpellingNormalizer
+
+Normalizes British English spellings to American English.
+
+```python
+from whisper.normalizers.english import EnglishSpellingNormalizer
+
+normalizer = EnglishSpellingNormalizer()
+text = normalizer("colour favour honour")
+print(text)  # "color favor honor"
+```
+
+### Examples
+
+```python
+from whisper.normalizers.english import EnglishSpellingNormalizer
+
+normalizer = EnglishSpellingNormalizer()
+
+# -our to -or
+print(normalizer("colour favour honour"))  # "color favor honor"
+
+# -ise to -ize
+print(normalizer("organise realise"))      # "organize realize"
+
+# -re to -er
+print(normalizer("centre theatre"))        # "center theater"
+
+# -ll to -l
+print(normalizer("travelled cancelled"))   # "traveled canceled"
+```
+
+## Utility Functions
+
+### remove_symbols_and_diacritics()
+
+Removes symbols, punctuation, and diacritical marks from text.
+
+```python
+from whisper.normalizers.basic import remove_symbols_and_diacritics
+
+text = remove_symbols_and_diacritics("café, naïve!")
+print(text)  # "cafe  naive "
+
+text = remove_symbols_and_diacritics("$100.50", keep=".$")
+print(text)  # "$100.50"
+```
+
+<ParamField path="s" type="str" required>
+  Input text to process
+</ParamField>
+
+<ParamField path="keep" type="str" default='""'>
+  String of characters to preserve (e.g., ".$" to keep dollar signs and periods)
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Text with symbols and diacritics removed (replaced with spaces), except for characters in `keep`
+</ResponseField>
+
+### remove_symbols()
+
+Removes symbols and punctuation while preserving diacritics.
+
+```python
+from whisper.normalizers.basic import remove_symbols
+
+text = remove_symbols("café, naïve!")
+print(text)  # "café  naïve "
+
+text = remove_symbols("$100 (fifty)")
+print(text)  # " 100  fifty "
+```
+
+<ParamField path="s" type="str" required>
+  Input text to process
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Text with symbols and punctuation removed (replaced with spaces), but diacritics preserved
+</ResponseField>
+
+## Use Cases
+
+### Comparing Transcriptions
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# Compare two transcriptions
+transcript1 = "Mr. Smith said he'd pay twenty-one dollars"
+transcript2 = "Mister Smith said he would pay $21"
+
+norm1 = normalizer(transcript1)
+norm2 = normalizer(transcript2)
+
+print(norm1)  # "mister smith said he had pay 21 dollars"
+print(norm2)  # "mister smith said he would pay 21 dollars"
+print(norm1 == norm2)  # False (close, but "had" vs "would")
+```
+
+### Calculating Word Error Rate (WER)
+
+```python
+from whisper.normalizers import EnglishTextNormalizer
+
+normalizer = EnglishTextNormalizer()
+
+# Normalize reference and hypothesis before WER calculation
+reference = "I can't believe it's the twenty-first century!"
+hypothesis = "I cannot believe its the 21st century"
+
+ref_norm = normalizer(reference)
+hyp_norm = normalizer(hypothesis)
+
+print("Reference:", ref_norm)
+print("Hypothesis:", hyp_norm)
+
+# Now calculate WER on normalized texts
+# (WER calculation code here)
+```
+
+### Multilingual Text Cleaning
+
+```python
+from whisper.normalizers import BasicTextNormalizer
+
+# For non-English languages, use BasicTextNormalizer
+normalizer = BasicTextNormalizer(remove_diacritics=False)
+
+# Preserve diacritics in French
+french_text = normalizer("C'est un café très élégant [musique]")
+print(french_text)  # "c'est un café très élégant"
+
+# Remove diacritics for ASCII compatibility
+normalizer_ascii = BasicTextNormalizer(remove_diacritics=True)
+ascii_text = normalizer_ascii("C'est un café très élégant")
+print(ascii_text)  # "c'est un cafe tres elegant"
+```
+
+### Preprocessing for Search/Indexing
+
+```python
+from whisper.normalizers import EnglishTextNormalizer, BasicTextNormalizer
+
+# English content
+english_normalizer = EnglishTextNormalizer()
+query = english_normalizer("Dr. Smith's twenty-first presentation")
+print(query)  # "doctor smiths 21st presentation"
+
+# Non-English content
+basic_normalizer = BasicTextNormalizer(remove_diacritics=True)
+query = basic_normalizer("Zürich café résumé")
+print(query)  # "zurich cafe resume"
+```
+
+## Diacritics Mapping
+
+The following special characters are mapped when `remove_diacritics=True`:
+
+| Character | Replacement |
+|-----------|-------------|
+| œ, Œ      | oe, OE      |
+| ø, Ø      | o, O        |
+| æ, Æ      | ae, AE      |
+| ß, ẞ      | ss, SS      |
+| đ, Đ      | d, D        |
+| ð, Ð      | d, D        |
+| þ, Þ      | th, th      |
+| ł, Ł      | l, L        |
+
+Additionally, all Unicode characters with the "Mn" (Mark, nonspacing) category are removed.

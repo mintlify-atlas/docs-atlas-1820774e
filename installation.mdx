@@ -1,0 +1,184 @@
+---
+title: Installation
+description: Set up Whisper on your system
+---
+
+## Prerequisites
+
+Before installing Whisper, ensure your system meets these requirements:
+
+- **Python**: Version 3.8 or higher (3.8-3.13 supported)
+- **PyTorch**: Recent versions (developed with PyTorch 1.10.1+)
+- **FFmpeg**: Required for audio processing
+
+## Installation Steps
+
+<Steps>
+  <Step title="Install Whisper via pip">
+    The easiest way to install Whisper is via pip. This will install the latest stable release:
+
+    ```bash
+    pip install -U openai-whisper
+    ```
+
+    <Tip>
+      The `-U` flag ensures you get the latest version if Whisper is already installed.
+    </Tip>
+
+    ### Alternative: Install from GitHub
+
+    To get the latest development version directly from the repository:
+
+    <CodeGroup>
+    ```bash Fresh Install
+    pip install git+https://github.com/openai/whisper.git
+    ```
+
+    ```bash Update Existing
+    pip install --upgrade --no-deps --force-reinstall git+https://github.com/openai/whisper.git
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install FFmpeg">
+    FFmpeg is required for audio file processing. Install it using your system's package manager:
+
+    <CodeGroup>
+    ```bash Ubuntu/Debian
+    sudo apt update && sudo apt install ffmpeg
+    ```
+
+    ```bash Arch Linux
+    sudo pacman -S ffmpeg
+    ```
+
+    ```bash macOS (Homebrew)
+    brew install ffmpeg
+    ```
+
+    ```bash Windows (Chocolatey)
+    choco install ffmpeg
+    ```
+
+    ```bash Windows (Scoop)
+    scoop install ffmpeg
+    ```
+    </CodeGroup>
+
+    <Note>
+      Make sure FFmpeg is accessible from your command line by running `ffmpeg -version` after installation.
+    </Note>
+  </Step>
+
+  <Step title="Verify Installation">
+    Verify that Whisper is installed correctly:
+
+    ```bash
+    whisper --help
+    ```
+
+    You can also verify the installation in Python:
+
+    ```python
+    import whisper
+    print(whisper.available_models())
+    ```
+
+    This should display a list of available model names without errors.
+  </Step>
+</Steps>
+
+## Dependencies
+
+Whisper automatically installs the following Python dependencies:
+
+- **more-itertools**: Utilities for working with iterables
+- **numba**: JIT compiler for numerical functions
+- **numpy**: Numerical computing library
+- **tiktoken**: Fast tokenizer implementation by OpenAI
+- **torch**: PyTorch deep learning framework
+- **tqdm**: Progress bar library
+- **triton**: GPU programming (Linux x86_64 only)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Rust installation errors">
+    If you see installation errors related to `tiktoken`, you may need to install Rust:
+
+    1. Visit the [Rust installation page](https://www.rust-lang.org/learn/get-started)
+    2. Follow the installation instructions for your platform
+    3. Configure your PATH:
+       ```bash
+       export PATH="$HOME/.cargo/bin:$PATH"
+       ```
+    4. Retry the Whisper installation
+  </Accordion>
+
+  <Accordion title="Missing setuptools_rust">
+    If installation fails with `No module named 'setuptools_rust'`, install it explicitly:
+
+    ```bash
+    pip install setuptools-rust
+    ```
+
+    Then retry installing Whisper.
+  </Accordion>
+
+  <Accordion title="FFmpeg not found">
+    If you get an error that FFmpeg is not found:
+
+    1. Verify FFmpeg is installed: `ffmpeg -version`
+    2. Ensure FFmpeg is in your system PATH
+    3. On Windows, you may need to restart your terminal or add FFmpeg to PATH manually
+  </Accordion>
+
+  <Accordion title="CUDA/GPU issues">
+    Whisper will automatically use CUDA if available. To verify GPU support:
+
+    ```python
+    import torch
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A'}")
+    ```
+
+    If CUDA is not detected but you have an NVIDIA GPU, reinstall PyTorch with CUDA support following the [PyTorch installation guide](https://pytorch.org/get-started/locally/).
+  </Accordion>
+
+  <Accordion title="SHA256 checksum errors">
+    If you encounter SHA256 checksum errors when downloading models:
+
+    1. Delete the cached model files in `~/.cache/whisper`
+    2. Retry loading the model
+    3. Check your internet connection for stability
+
+    The models are downloaded on first use and cached locally for future use.
+  </Accordion>
+</AccordionGroup>
+
+## System Requirements by Model
+
+Ensure your system has sufficient VRAM for your chosen model:
+
+| Model  | VRAM Required | Best For                           |
+|--------|---------------|------------------------------------|
+| tiny   | ~1 GB         | Fast transcription, limited resources |
+| base   | ~1 GB         | Balanced speed and accuracy        |
+| small  | ~2 GB         | Better accuracy, moderate speed    |
+| medium | ~5 GB         | High accuracy, translation tasks   |
+| large  | ~10 GB        | Maximum accuracy                   |
+| turbo  | ~6 GB         | Fast with high accuracy (recommended) |
+
+<Warning>
+  CPU inference is supported but will be significantly slower than GPU inference, especially for larger models.
+</Warning>
+
+## Next Steps
+
+<Card
+  title="Quickstart Guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Start using Whisper with practical examples for both CLI and Python API
+</Card>

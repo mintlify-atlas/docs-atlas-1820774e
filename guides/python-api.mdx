@@ -1,0 +1,312 @@
+---
+title: 'Python API'
+description: 'Use Whisper programmatically in your Python applications'
+icon: 'code'
+---
+
+## Overview
+
+Whisper provides a clean Python API for integrating speech recognition and translation into your applications. This guide covers the main functions and common usage patterns.
+
+## Basic Transcription
+
+<Steps>
+  <Step title="Import and load model">
+    ```python
+    import whisper
+    
+    model = whisper.load_model("turbo")
+    ```
+    
+    Available models: `tiny`, `base`, `small`, `medium`, `large`, `turbo`, or English-only variants (`tiny.en`, `base.en`, `small.en`, `medium.en`).
+  </Step>
+  
+  <Step title="Transcribe audio">
+    ```python
+    result = model.transcribe("audio.mp3")
+    print(result["text"])
+    ```
+  </Step>
+</Steps>
+
+## The `transcribe()` Function
+
+The `transcribe()` method is the primary interface for audio transcription.
+
+### Function Signature
+
+```python
+def transcribe(
+    model: Whisper,
+    audio: Union[str, np.ndarray, torch.Tensor],
+    *,
+    verbose: Optional[bool] = None,
+    temperature: Union[float, Tuple[float, ...]] = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+    compression_ratio_threshold: Optional[float] = 2.4,
+    logprob_threshold: Optional[float] = -1.0,
+    no_speech_threshold: Optional[float] = 0.6,
+    condition_on_previous_text: bool = True,
+    initial_prompt: Optional[str] = None,
+    carry_initial_prompt: bool = False,
+    word_timestamps: bool = False,
+    prepend_punctuations: str = "\"'¿([{-",
+    append_punctuations: str = "\"\'。,，!！?？:：\")]}、",
+    clip_timestamps: Union[str, List[float]] = "0",
+    hallucination_silence_threshold: Optional[float] = None,
+    **decode_options,
+)
+```
+
+### Parameters
+
+<Tabs>
+  <Tab title="Basic">
+    - `audio`: Path to audio file, or audio waveform as NumPy array or PyTorch tensor
+    - `verbose`: Display transcription progress (`True`, `False`, or `None` for silent)
+    - `language`: Specify the spoken language (e.g., `"en"`, `"ja"`, `"es"`)
+    - `task`: Either `"transcribe"` or `"translate"` (default: `"transcribe"`)
+  </Tab>
+  
+  <Tab title="Quality Control">
+    - `temperature`: Sampling temperature or tuple of temperatures for fallback (default: `(0.0, 0.2, 0.4, 0.6, 0.8, 1.0)`)
+    - `compression_ratio_threshold`: Retry if gzip compression ratio exceeds this (default: `2.4`)
+    - `logprob_threshold`: Retry if average log probability is below this (default: `-1.0`)
+    - `no_speech_threshold`: Probability threshold for detecting silence (default: `0.6`)
+  </Tab>
+  
+  <Tab title="Timestamps">
+    - `word_timestamps`: Extract word-level timestamps using cross-attention (default: `False`)
+    - `prepend_punctuations`: Punctuation marks to merge with the next word
+    - `append_punctuations`: Punctuation marks to merge with the previous word
+    - `clip_timestamps`: List of `[start, end]` timestamps to process specific clips
+    - `hallucination_silence_threshold`: Skip silent periods when hallucination detected
+  </Tab>
+  
+  <Tab title="Context">
+    - `condition_on_previous_text`: Use previous output as context (default: `True`)
+    - `initial_prompt`: Text prompt for the first window to guide transcription
+    - `carry_initial_prompt`: Prepend `initial_prompt` to every decode call
+  </Tab>
+</Tabs>
+
+### Return Value
+
+Returns a dictionary containing:
+
+```python
+{
+    "text": str,              # Full transcription text
+    "segments": List[dict],   # List of segments with timestamps and metadata
+    "language": str           # Detected or specified language code
+}
+```
+
+Each segment contains:
+
+```python
+{
+    "id": int,
+    "seek": int,
+    "start": float,
+    "end": float,
+    "text": str,
+    "tokens": List[int],
+    "temperature": float,
+    "avg_logprob": float,
+    "compression_ratio": float,
+    "no_speech_prob": float,
+    "words": List[dict]  # Only present if word_timestamps=True
+}
+```
+
+## Usage Examples
+
+### Specify Language
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+result = model.transcribe("japanese.wav", language="ja")
+print(result["text"])
+```
+
+### Get Segment Details
+
+```python
+result = model.transcribe("audio.mp3")
+
+for segment in result["segments"]:
+    print(f"[{segment['start']:.2f}s -> {segment['end']:.2f}s] {segment['text']}")
+```
+
+### Use Initial Prompt for Custom Vocabulary
+
+```python
+result = model.transcribe(
+    "technical_talk.mp3",
+    initial_prompt="This is a discussion about PyTorch, CUDA, and neural networks."
+)
+```
+
+<Tip>
+The `initial_prompt` parameter is useful for improving accuracy with domain-specific vocabulary, proper nouns, or technical terms.
+</Tip>
+
+### Extract Word-Level Timestamps
+
+```python
+result = model.transcribe("audio.mp3", word_timestamps=True)
+
+for segment in result["segments"]:
+    for word in segment["words"]:
+        print(f"{word['word']} [{word['start']:.2f}s - {word['end']:.2f}s]")
+```
+
+### Process Specific Time Ranges
+
+```python
+# Process audio from 30-60s and 120-180s
+result = model.transcribe(
+    "long_audio.mp3",
+    clip_timestamps=[30, 60, 120, 180]
+)
+```
+
+### Disable Context Conditioning
+
+```python
+# More robust to repetition loops, but less consistent across segments
+result = model.transcribe(
+    "audio.mp3",
+    condition_on_previous_text=False
+)
+```
+
+## Lower-Level Access
+
+For more control, use `detect_language()` and `decode()` functions:
+
+### Language Detection
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Load and preprocess audio
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# Generate Mel spectrogram
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+# Detect language
+_, probs = model.detect_language(mel)
+detected_language = max(probs, key=probs.get)
+print(f"Detected language: {detected_language}")
+print(f"Probability: {probs[detected_language]:.2%}")
+```
+
+### Manual Decoding
+
+```python
+import whisper
+from whisper.decoding import DecodingOptions, decode
+
+model = whisper.load_model("turbo")
+
+# Load and preprocess audio
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# Generate Mel spectrogram
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+# Configure decoding options
+options = DecodingOptions(
+    language="en",
+    task="transcribe",
+    temperature=0.0,
+    fp16=True
+)
+
+# Decode the audio
+result = decode(model, mel, options)
+print(result.text)
+```
+
+<Note>
+The `transcribe()` function internally handles sliding windows and processes the entire audio file. The `decode()` function only processes a single 30-second segment.
+</Note>
+
+## Model Loading Options
+
+### Load from Specific Directory
+
+```python
+model = whisper.load_model("turbo", download_root="/path/to/models")
+```
+
+By default, models are cached in `~/.cache/whisper/`.
+
+### Device Selection
+
+```python
+import torch
+
+# Load on GPU
+model = whisper.load_model("turbo", device="cuda")
+
+# Load on CPU
+model = whisper.load_model("turbo", device="cpu")
+
+# Auto-select
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = whisper.load_model("turbo", device=device)
+```
+
+## Batch Processing
+
+```python
+import whisper
+import os
+from pathlib import Path
+
+model = whisper.load_model("turbo")
+audio_dir = Path("./audio_files")
+
+for audio_file in audio_dir.glob("*.mp3"):
+    print(f"Transcribing {audio_file.name}...")
+    result = model.transcribe(str(audio_file))
+    
+    # Save transcription
+    output_file = audio_dir / f"{audio_file.stem}.txt"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(result["text"])
+```
+
+## Audio Preprocessing
+
+Whisper includes utility functions for audio processing:
+
+```python
+import whisper
+import numpy as np
+
+# Load audio file (resampled to 16kHz)
+audio = whisper.load_audio("audio.mp3")
+
+# Pad or trim to 30 seconds
+audio_30s = whisper.pad_or_trim(audio)
+
+# Generate Mel spectrogram
+mel = whisper.log_mel_spectrogram(audio, n_mels=80)
+
+print(f"Audio shape: {audio.shape}")  # (samples,)
+print(f"Mel shape: {mel.shape}")      # (80, frames)
+```
+
+<Warning>
+Audio must be resampled to 16kHz mono. The `whisper.load_audio()` function handles this automatically using FFmpeg.
+</Warning>

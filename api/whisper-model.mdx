@@ -1,0 +1,302 @@
+---
+title: 'Whisper Model'
+description: 'Core Whisper model class and dimensions'
+---
+
+## Whisper
+
+The main Whisper model class that performs speech recognition. Inherits from `torch.nn.Module`.
+
+### Constructor
+
+```python
+Whisper(dims: ModelDimensions)
+```
+
+<ParamField path="dims" type="ModelDimensions" required>
+  Model dimensions configuration containing architecture parameters
+</ParamField>
+
+### Attributes
+
+<ParamField path="dims" type="ModelDimensions">
+  The model dimensions used to initialize the encoder and decoder
+</ParamField>
+
+<ParamField path="encoder" type="AudioEncoder">
+  The audio encoder that processes mel spectrograms into features
+</ParamField>
+
+<ParamField path="decoder" type="TextDecoder">
+  The text decoder that generates text tokens from audio features
+</ParamField>
+
+<ParamField path="alignment_heads" type="torch.Tensor">
+  Sparse tensor indicating which attention heads to use for time alignment. By default, uses the last half of decoder layers.
+</ParamField>
+
+### Properties
+
+<ParamField path="device" type="torch.device">
+  The device (CPU/GPU) where the model parameters are stored
+</ParamField>
+
+<ParamField path="is_multilingual" type="bool">
+  Returns `True` if the model supports multiple languages (vocab size >= 51865)
+</ParamField>
+
+<ParamField path="num_languages" type="int">
+  Number of languages supported by the model
+</ParamField>
+
+### Methods
+
+#### embed_audio
+
+```python
+def embed_audio(mel: torch.Tensor) -> torch.Tensor
+```
+
+Encode audio mel spectrogram into features.
+
+<ParamField path="mel" type="torch.Tensor">
+  Mel spectrogram with shape `(batch_size, n_mels, n_ctx)`
+</ParamField>
+
+<ResponseField name="return" type="torch.Tensor">
+  Encoded audio features with shape `(batch_size, n_audio_ctx, n_audio_state)`
+</ResponseField>
+
+#### logits
+
+```python
+def logits(tokens: torch.Tensor, audio_features: torch.Tensor) -> torch.Tensor
+```
+
+Compute logits for next token prediction.
+
+<ParamField path="tokens" type="torch.Tensor">
+  Text tokens with shape `(batch_size, seq_len)`
+</ParamField>
+
+<ParamField path="audio_features" type="torch.Tensor">
+  Encoded audio features from `embed_audio()`
+</ParamField>
+
+<ResponseField name="return" type="torch.Tensor">
+  Logits for next token with shape `(batch_size, seq_len, vocab_size)`
+</ResponseField>
+
+#### forward
+
+```python
+def forward(mel: torch.Tensor, tokens: torch.Tensor) -> Dict[str, torch.Tensor]
+```
+
+Full forward pass through encoder and decoder.
+
+<ParamField path="mel" type="torch.Tensor">
+  Mel spectrogram input
+</ParamField>
+
+<ParamField path="tokens" type="torch.Tensor">
+  Text tokens
+</ParamField>
+
+<ResponseField name="return" type="torch.Tensor">
+  Decoder output logits
+</ResponseField>
+
+#### set_alignment_heads
+
+```python
+def set_alignment_heads(dump: bytes) -> None
+```
+
+Set custom alignment heads for cross-attention analysis.
+
+<ParamField path="dump" type="bytes">
+  Base85-encoded, gzip-compressed boolean array specifying which attention heads to use
+</ParamField>
+
+#### install_kv_cache_hooks
+
+```python
+def install_kv_cache_hooks(cache: Optional[dict] = None) -> Tuple[Dict, List]
+```
+
+Install hooks for key-value caching to speed up autoregressive decoding.
+
+<ParamField path="cache" type="Optional[dict]">
+  Existing cache dictionary to extend, or `None` to create new cache
+</ParamField>
+
+<ResponseField name="cache" type="Dict[nn.Module, torch.Tensor]">
+  Dictionary mapping key/value projection modules to cached tensors
+</ResponseField>
+
+<ResponseField name="hooks" type="List[RemovableHandle]">
+  List of PyTorch hook handles that can be used to remove the hooks
+</ResponseField>
+
+#### transcribe
+
+```python
+def transcribe(
+    audio: Union[str, np.ndarray, torch.Tensor],
+    **kwargs
+) -> dict
+```
+
+Transcribe audio to text with timestamps and metadata. See the [transcribe](/api/transcribe) documentation for details.
+
+#### decode
+
+```python
+def decode(
+    mel: torch.Tensor,
+    options: DecodingOptions = DecodingOptions(),
+    **kwargs
+) -> Union[DecodingResult, List[DecodingResult]]
+```
+
+Decode mel spectrogram(s) to text. See the [decode](/api/decode) documentation for details.
+
+#### detect_language
+
+```python
+def detect_language(
+    mel: Tensor,
+    tokenizer: Tokenizer = None
+) -> Tuple[Tensor, List[dict]]
+```
+
+Detect the spoken language in audio. Returns language tokens and probability distributions.
+
+## ModelDimensions
+
+Dataclass containing model architecture dimensions.
+
+```python
+@dataclass
+class ModelDimensions:
+    n_mels: int
+    n_audio_ctx: int
+    n_audio_state: int
+    n_audio_head: int
+    n_audio_layer: int
+    n_vocab: int
+    n_text_ctx: int
+    n_text_state: int
+    n_text_head: int
+    n_text_layer: int
+```
+
+### Fields
+
+<ParamField path="n_mels" type="int" required>
+  Number of mel filterbank channels (typically 80)
+</ParamField>
+
+<ParamField path="n_audio_ctx" type="int" required>
+  Audio context length - number of frames in the encoder
+</ParamField>
+
+<ParamField path="n_audio_state" type="int" required>
+  Hidden dimension size of the audio encoder
+</ParamField>
+
+<ParamField path="n_audio_head" type="int" required>
+  Number of attention heads in the audio encoder
+</ParamField>
+
+<ParamField path="n_audio_layer" type="int" required>
+  Number of layers in the audio encoder
+</ParamField>
+
+<ParamField path="n_vocab" type="int" required>
+  Vocabulary size - determines if model is multilingual (>= 51865)
+</ParamField>
+
+<ParamField path="n_text_ctx" type="int" required>
+  Text context length - maximum sequence length for the decoder
+</ParamField>
+
+<ParamField path="n_text_state" type="int" required>
+  Hidden dimension size of the text decoder
+</ParamField>
+
+<ParamField path="n_text_head" type="int" required>
+  Number of attention heads in the text decoder
+</ParamField>
+
+<ParamField path="n_text_layer" type="int" required>
+  Number of layers in the text decoder
+</ParamField>
+
+## Usage Examples
+
+### Loading a Model
+
+```python
+import whisper
+
+# Load pre-trained model
+model = whisper.load_model("base")
+
+# Check model properties
+print(f"Is multilingual: {model.is_multilingual}")
+print(f"Number of languages: {model.num_languages}")
+print(f"Device: {model.device}")
+```
+
+### Using Model Components
+
+```python
+import torch
+from whisper.audio import log_mel_spectrogram
+
+# Load and process audio
+mel = log_mel_spectrogram(audio)
+mel = mel.to(model.device)
+
+# Encode audio
+audio_features = model.embed_audio(mel)
+
+# Prepare tokens and get logits
+tokens = torch.tensor([[model.dims.n_vocab - 1]])  # Start token
+logits = model.logits(tokens, audio_features)
+```
+
+### Creating Custom Model
+
+```python
+from whisper.model import Whisper, ModelDimensions
+
+# Define custom dimensions (tiny model example)
+dims = ModelDimensions(
+    n_mels=80,
+    n_audio_ctx=1500,
+    n_audio_state=384,
+    n_audio_head=6,
+    n_audio_layer=4,
+    n_vocab=51864,
+    n_text_ctx=448,
+    n_text_state=384,
+    n_text_head=6,
+    n_text_layer=4,
+)
+
+# Create model instance
+custom_model = Whisper(dims)
+```
+
+## Notes
+
+- The `Whisper` class is typically loaded using `whisper.load_model()` rather than instantiated directly
+- Models are available in sizes: tiny, base, small, medium, large
+- Multilingual models have vocab size >= 51865 and support 99 languages
+- English-only models are more accurate for English but don't support other languages
+- Use `model.to(device)` to move the model to GPU for faster inference
+- The encoder processes 30-second audio chunks at a time
+- KV cache hooks are used internally by the decode function for efficiency

@@ -1,0 +1,121 @@
+---
+title: 'load_model()'
+description: 'Load a Whisper ASR model'
+---
+
+## Function Signature
+
+```python
+def load_model(
+    name: str,
+    device: Optional[Union[str, torch.device]] = None,
+    download_root: str = None,
+    in_memory: bool = False,
+) -> Whisper
+```
+
+## Parameters
+
+<ParamField path="name" type="str" required>
+  One of the official model names listed by `whisper.available_models()`, or path to a model checkpoint containing the model dimensions and the model state_dict.
+  
+  Available official models:
+  - `tiny.en`, `tiny`
+  - `base.en`, `base`
+  - `small.en`, `small`
+  - `medium.en`, `medium`
+  - `large-v1`, `large-v2`, `large-v3`, `large`
+  - `large-v3-turbo`, `turbo`
+  
+  Models with `.en` suffix are English-only variants.
+</ParamField>
+
+<ParamField path="device" type="Union[str, torch.device]" default="None">
+  The PyTorch device to put the model into. If not specified, automatically selects `"cuda"` if available, otherwise `"cpu"`.
+  
+  Common values: `"cuda"`, `"cpu"`, `"cuda:0"`, `torch.device("cuda")`
+</ParamField>
+
+<ParamField path="download_root" type="str" default="None">
+  Path to download the model files. By default, uses `"~/.cache/whisper"` (or `$XDG_CACHE_HOME/whisper` if the environment variable is set).
+  
+  The function creates this directory if it doesn't exist.
+</ParamField>
+
+<ParamField path="in_memory" type="bool" default="False">
+  Whether to preload the model weights into host memory. When `True`, the model checkpoint is kept in memory as bytes rather than being read from disk.
+  
+  This can be useful for deployment scenarios where filesystem access is limited.
+</ParamField>
+
+## Returns
+
+<ResponseField name="model" type="Whisper">
+  The Whisper ASR model instance, ready for inference. The model is already loaded onto the specified device and has its state_dict loaded.
+  
+  The returned model has alignment heads set if it's an official model (used for word-level timestamps).
+</ResponseField>
+
+## Example
+
+```python
+import whisper
+
+# Load the base model (auto-detects CUDA)
+model = whisper.load_model("base")
+
+# Load the turbo model on CPU
+model = whisper.load_model("turbo", device="cpu")
+
+# Load from a custom checkpoint file
+model = whisper.load_model("/path/to/custom-model.pt")
+
+# Load with custom cache directory
+model = whisper.load_model("small", download_root="/custom/cache/path")
+
+# Load in-memory (useful for serverless deployments)
+model = whisper.load_model("base", in_memory=True)
+```
+
+## Notes
+
+### Model Download and Caching
+
+- On first use, models are downloaded from Azure CDN to the cache directory
+- Downloaded models are verified using SHA256 checksums
+- Subsequent calls reuse the cached model files
+- If checksum verification fails, the model is re-downloaded automatically
+
+### Model Selection
+
+Choose a model based on your requirements:
+
+- **Speed**: `tiny` (fastest) → `turbo` → `base` → `small` → `medium` → `large` (slowest)
+- **Accuracy**: `tiny` (lowest) → `base` → `small` → `medium` → `large` → `turbo` (highest)
+- **English-only**: Use `.en` variants for better English performance
+- **Multilingual**: Use non-`.en` models for 99+ languages
+
+### Device Compatibility
+
+- FP16 (half precision) is only supported on CUDA devices
+- CPU inference automatically uses FP32 even if FP16 is requested
+- The model returns a warning if performing inference on CPU when CUDA is available
+
+### Error Handling
+
+```python
+try:
+    model = whisper.load_model("nonexistent-model")
+except RuntimeError as e:
+    # Raises: Model nonexistent-model not found; available models = [...]
+    print(e)
+```
+
+### Alignment Heads
+
+Official models automatically have alignment heads configured, which are used for:
+- Word-level timestamp extraction
+- Cross-attention pattern analysis
+- Dynamic time warping for precise timing
+
+Custom checkpoints loaded from file paths will not have alignment heads set unless they were included in the checkpoint.

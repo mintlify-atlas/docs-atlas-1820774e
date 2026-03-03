@@ -1,0 +1,233 @@
+---
+title: 'CLI Usage'
+description: 'Use Whisper from the command line for audio transcription and translation'
+icon: 'terminal'
+---
+
+## Overview
+
+The `whisper` command-line tool provides a simple interface for transcribing and translating audio files. It supports multiple audio formats and offers extensive customization options.
+
+## Basic Usage
+
+<Steps>
+  <Step title="Install Whisper">
+    ```bash
+    pip install -U openai-whisper
+    ```
+    
+    You'll also need `ffmpeg` installed on your system:
+    
+    <CodeGroup>
+    ```bash Ubuntu/Debian
+    sudo apt update && sudo apt install ffmpeg
+    ```
+    
+    ```bash macOS
+    brew install ffmpeg
+    ```
+    
+    ```bash Windows (Chocolatey)
+    choco install ffmpeg
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Transcribe an audio file">
+    ```bash
+    whisper audio.mp3
+    ```
+    
+    By default, this uses the `turbo` model and outputs all available formats (txt, vtt, srt, tsv, json).
+  </Step>
+</Steps>
+
+## Command Syntax
+
+```bash
+whisper [audio_files...] [options]
+```
+
+### Multiple Files
+
+Process multiple audio files in one command:
+
+```bash
+whisper audio.flac audio.mp3 audio.wav --model turbo
+```
+
+## Model Selection
+
+Choose from different model sizes to balance speed and accuracy:
+
+```bash
+whisper audio.mp3 --model medium
+```
+
+Available models: `tiny`, `base`, `small`, `medium`, `large`, `turbo`, or English-only variants (`tiny.en`, `base.en`, `small.en`, `medium.en`).
+
+<Note>
+The default model is `turbo`, which offers fast transcription with good accuracy for English and multilingual content.
+</Note>
+
+## Language Options
+
+### Automatic Language Detection
+
+By default, Whisper detects the language automatically:
+
+```bash
+whisper japanese.wav
+```
+
+### Specify Language
+
+For better performance, specify the language explicitly:
+
+```bash
+whisper japanese.wav --language Japanese
+```
+
+You can use either the language name (e.g., `Japanese`, `Spanish`) or language code (e.g., `ja`, `es`).
+
+### Translation to English
+
+Translate non-English speech directly to English:
+
+```bash
+whisper japanese.wav --model medium --language Japanese --task translate
+```
+
+<Warning>
+The `turbo` model does **not** support translation. Use multilingual models (`tiny`, `base`, `small`, `medium`, `large`) for translation tasks.
+</Warning>
+
+## Output Options
+
+### Output Directory
+
+Specify where to save the transcription files:
+
+```bash
+whisper audio.mp3 --output_dir ./transcripts
+```
+
+### Output Format
+
+Choose specific output formats:
+
+```bash
+whisper audio.mp3 --output_format srt
+```
+
+Available formats:
+- `txt` - Plain text
+- `vtt` - WebVTT subtitles
+- `srt` - SubRip subtitles
+- `tsv` - Tab-separated values with timestamps
+- `json` - JSON with detailed segment information
+- `all` - Generate all formats (default)
+
+## Advanced Options
+
+### Word-Level Timestamps
+
+Extract word-level timestamps for precise timing:
+
+```bash
+whisper audio.mp3 --word_timestamps True
+```
+
+This enables additional subtitle formatting options:
+
+```bash
+whisper audio.mp3 --word_timestamps True --max_line_width 50 --highlight_words True
+```
+
+### Device Selection
+
+Choose between CPU and GPU processing:
+
+```bash
+whisper audio.mp3 --device cuda  # Use GPU
+whisper audio.mp3 --device cpu   # Use CPU
+```
+
+### Initial Prompt
+
+Provide context or custom vocabulary to improve accuracy:
+
+```bash
+whisper audio.mp3 --initial_prompt "This is a technical discussion about machine learning and neural networks."
+```
+
+### Temperature and Sampling
+
+<Tabs>
+  <Tab title="Greedy Decoding">
+    Use temperature 0 for deterministic output:
+    ```bash
+    whisper audio.mp3 --temperature 0 --beam_size 5
+    ```
+  </Tab>
+  
+  <Tab title="Sampling">
+    Use non-zero temperature for sampling:
+    ```bash
+    whisper audio.mp3 --temperature 0.8 --best_of 5
+    ```
+  </Tab>
+</Tabs>
+
+### Compression and Quality Thresholds
+
+```bash
+whisper audio.mp3 \
+  --compression_ratio_threshold 2.4 \
+  --logprob_threshold -1.0 \
+  --no_speech_threshold 0.6
+```
+
+- `--compression_ratio_threshold`: Detect and retry overly repetitive outputs (default: 2.4)
+- `--logprob_threshold`: Retry if average log probability is too low (default: -1.0)
+- `--no_speech_threshold`: Detect silent segments (default: 0.6)
+
+## Common Examples
+
+### Transcribe with High Accuracy
+
+```bash
+whisper interview.mp3 --model large --language English
+```
+
+### Generate SRT Subtitles
+
+```bash
+whisper video.mp4 --model medium --output_format srt --word_timestamps True
+```
+
+### Process Specific Audio Clips
+
+```bash
+whisper podcast.mp3 --clip_timestamps "0,300,600,900" --output_dir ./segments
+```
+
+This processes clips from 0-300s and 600-900s.
+
+### Batch Processing with Consistent Settings
+
+```bash
+whisper *.wav --model turbo --language English --output_dir ./output --output_format json
+```
+
+## Full Options Reference
+
+View all available options:
+
+```bash
+whisper --help
+```
+
+<Tip>
+For large files or batch processing, consider using a GPU with `--device cuda` to significantly speed up transcription.
+</Tip>

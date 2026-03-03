@@ -1,0 +1,204 @@
+---
+title: Changelog
+description: Version history and release notes for Whisper
+---
+
+Complete version history of Whisper releases, including new features, bug fixes, and improvements.
+
+## [v20250625](https://github.com/openai/whisper/releases/tag/v20250625)
+
+### Security & Bug Fixes
+- Update `torch.load` to use `weights_only=True` to prevent security vulnerabilities ([#2451](https://github.com/openai/whisper/pull/2451))
+- Ensure DTW cost tensor is on the same device as input tensor ([#2561](https://github.com/openai/whisper/pull/2561))
+- Fixed triton kernel update to support latest triton versions ([#2588](https://github.com/openai/whisper/pull/2588))
+- Fix GitHub display errors for Jupyter notebooks ([#2589](https://github.com/openai/whisper/pull/2589))
+- Bugfix: Illogical "Avoid computing higher temperatures on no_speech" ([#1903](https://github.com/openai/whisper/pull/1903))
+- Fix typo in data/README.md ([#2433](https://github.com/openai/whisper/pull/2433))
+
+### Documentation
+- Updated README to specify translation model limitation ([#2547](https://github.com/openai/whisper/pull/2547))
+- Updating README and doc strings to reflect that n_mels can now be 128 ([#2049](https://github.com/openai/whisper/pull/2049))
+- Update README.md ([#2379](https://github.com/openai/whisper/pull/2379))
+
+### Features
+- Add option to carry initial_prompt with the sliding window ([#2343](https://github.com/openai/whisper/pull/2343))
+
+### Development & CI
+- Bump the github-actions group with 3 updates ([#2592](https://github.com/openai/whisper/pull/2592))
+- Keep GitHub Actions up to date with GitHub's Dependabot ([#2486](https://github.com/openai/whisper/pull/2486))
+- pre-commit: Upgrade black v25.1.0 and isort v6.0.0 ([#2514](https://github.com/openai/whisper/pull/2514))
+- GitHub Actions: Add Python 3.13 to the testing ([#2487](https://github.com/openai/whisper/pull/2487))
+- PEP 621: Migrate from setup.py to pyproject.toml ([#2435](https://github.com/openai/whisper/pull/2435))
+- pre-commit autoupdate && pre-commit run --all-files ([#2484](https://github.com/openai/whisper/pull/2484))
+- Upgrade GitHub Actions ([#2430](https://github.com/openai/whisper/pull/2430))
+- More pytorch versions in tests ([#2408](https://github.com/openai/whisper/pull/2408))
+
+---
+
+## [v20240930](https://github.com/openai/whisper/releases/tag/v20240930)
+
+### Features
+- **large-v3-turbo model** - New optimized model for faster inference ([#2361](https://github.com/openai/whisper/pull/2361))
+- Using SDPA (Scaled Dot Product Attention) if available ([#2359](https://github.com/openai/whisper/pull/2359))
+
+### Development
+- Allowing numpy 2 in tests ([#2362](https://github.com/openai/whisper/pull/2362))
+- Test on Python/PyTorch versions up to 3.12 and 2.4.1 ([#2360](https://github.com/openai/whisper/pull/2360))
+
+---
+
+## [v20240927](https://github.com/openai/whisper/releases/tag/v20240927)
+
+### Bug Fixes
+- Skip silence around hallucinations ([#1838](https://github.com/openai/whisper/pull/1838))
+- Fix triton env marker ([#1887](https://github.com/openai/whisper/pull/1887))
+
+### Development
+- Pinning numpy&lt;2 in tests ([#2332](https://github.com/openai/whisper/pull/2332))
+- Relax triton requirements for compatibility with PyTorch 2.4 and newer ([#2307](https://github.com/openai/whisper/pull/2307))
+
+---
+
+## [v20231117](https://github.com/openai/whisper/releases/tag/v20231117)
+
+### Compatibility
+- Relax triton requirements for compatibility with PyTorch 2.1 and newer ([#1802](https://github.com/openai/whisper/pull/1802))
+
+---
+
+## [v20231106](https://github.com/openai/whisper/releases/tag/v20231106)
+
+### Features
+- **large-v3** - New improved large model ([#1761](https://github.com/openai/whisper/pull/1761))
+
+---
+
+## [v20231105](https://github.com/openai/whisper/releases/tag/v20231105)
+
+### Features
+- Add new option to generate subtitles by a specific number of words ([#1729](https://github.com/openai/whisper/pull/1729))
+
+### Bug Fixes
+- Fix exception when an audio file with no speech is provided ([#1396](https://github.com/openai/whisper/pull/1396))
+- Handling transcribe exceptions ([#1682](https://github.com/openai/whisper/pull/1682))
+
+### Security
+- allow_pickle=False while loading mel matrix in audio.py ([#1511](https://github.com/openai/whisper/pull/1511))
+
+### Development
+- Remove tiktoken pin ([#1759](https://github.com/openai/whisper/pull/1759))
+
+### Documentation
+- Disambiguation of the term "relative speed" in the README ([#1751](https://github.com/openai/whisper/pull/1751))
+
+---
+
+## [v20230918](https://github.com/openai/whisper/releases/tag/v20230918)
+
+### Features
+- Word timing tweaks ([#1559](https://github.com/openai/whisper/pull/1559))
+- Implement max line width and max line count, and make word highlighting optional ([#1184](https://github.com/openai/whisper/pull/1184))
+
+### Bug Fixes
+- Fix condition_on_previous_text ([#1224](https://github.com/openai/whisper/pull/1224))
+- Fix numba deprecation notice ([#1233](https://github.com/openai/whisper/pull/1233))
+- Drop ffmpeg-python dependency and call ffmpeg directly ([#1242](https://github.com/openai/whisper/pull/1242))
+
+### Performance
+- Avoid rearranging all caches ([#1483](https://github.com/openai/whisper/pull/1483))
+- Avoid computing higher temperatures on no_speech segments ([#1279](https://github.com/openai/whisper/pull/1279))
+
+### Improvements
+- Improve timestamp heuristics ([#1461](https://github.com/openai/whisper/pull/1461))
+- Squash long words at window and sentence boundaries ([#1114](https://github.com/openai/whisper/pull/1114))
+
+### Development
+- Add .pre-commit-config.yaml ([#1528](https://github.com/openai/whisper/pull/1528))
+- Python 3.11 support ([#1171](https://github.com/openai/whisper/pull/1171))
+- Dropped unused execute bit from mel_filters.npz ([#1254](https://github.com/openai/whisper/pull/1254))
+
+### Documentation
+- Fix doc of TextDecoder ([#1526](https://github.com/openai/whisper/pull/1526))
+- Update model-card.md ([#1643](https://github.com/openai/whisper/pull/1643))
+- Updated README.md to provide more insight on BLEU and specific appendices ([#1236](https://github.com/openai/whisper/pull/1236))
+- Update README.md to reference tiktoken ([#1105](https://github.com/openai/whisper/pull/1105))
+- Update decoding.py ([#1219](https://github.com/openai/whisper/pull/1219), [#1155](https://github.com/openai/whisper/pull/1155))
+- Update tokenizer.py ([#1163](https://github.com/openai/whisper/pull/1163))
+
+---
+
+## [v20230314](https://github.com/openai/whisper/releases/tag/v20230314)
+
+### Features
+- **Use tiktoken** for fast tokenization ([#1044](https://github.com/openai/whisper/pull/1044))
+
+### Bug Fixes
+- Abort find_alignment on empty input ([#1090](https://github.com/openai/whisper/pull/1090))
+- Fix truncated words list when the replacement character is decoded ([#1089](https://github.com/openai/whisper/pull/1089))
+- Fix alignment between the segments and the list of words ([#1087](https://github.com/openai/whisper/pull/1087))
+- Fix github language stats getting dominated by jupyter notebook ([#1076](https://github.com/openai/whisper/pull/1076))
+
+---
+
+## [v20230308](https://github.com/openai/whisper/releases/tag/v20230308)
+
+### Features
+- kwargs in decode() for convenience ([#1061](https://github.com/openai/whisper/pull/1061))
+
+### Bug Fixes
+- Fix all_tokens handling that caused more repetitions and discrepancy in JSON ([#1060](https://github.com/openai/whisper/pull/1060))
+- Fix typo in CHANGELOG.md
+
+---
+
+## [v20230307](https://github.com/openai/whisper/releases/tag/v20230307)
+
+### Bug Fixes
+- Fix the repetition/hallucination issue identified in #1046 ([#1052](https://github.com/openai/whisper/pull/1052))
+
+### Development
+- Use triton==2.0.0 ([#1053](https://github.com/openai/whisper/pull/1053))
+- Install triton in x86_64 linux only ([#1051](https://github.com/openai/whisper/pull/1051))
+- Update setup.py to specify python >= 3.8 requirement
+
+---
+
+## [v20230306](https://github.com/openai/whisper/releases/tag/v20230306)
+
+### Features
+- **Word-level timestamps** in `transcribe()` ([#869](https://github.com/openai/whisper/pull/869))
+- Decoding improvements ([#1033](https://github.com/openai/whisper/pull/1033))
+
+### Bug Fixes
+- Fix infinite loop caused by incorrect timestamp tokens prediction ([#914](https://github.com/openai/whisper/pull/914))
+
+### Development
+- Remove auxiliary audio extension ([#1021](https://github.com/openai/whisper/pull/1021))
+- Apply formatting with `black`, `isort`, and `flake8` ([#1038](https://github.com/openai/whisper/pull/1038))
+- Drop Python 3.7 support ([#889](https://github.com/openai/whisper/pull/889))
+
+### Documentation
+- Update README.md ([#894](https://github.com/openai/whisper/pull/894))
+
+---
+
+## [v20230124](https://github.com/openai/whisper/releases/tag/v20230124)
+
+### Features
+- Add TSV formatted output in transcript, using integer start/end time in milliseconds ([#228](https://github.com/openai/whisper/pull/228))
+- Added `--output_format` option ([#333](https://github.com/openai/whisper/pull/333))
+
+### Bug Fixes
+- Fix bug where mm is mistakenly replaced with hmm in e.g. 20mm ([#659](https://github.com/openai/whisper/pull/659))
+- Handle `XDG_CACHE_HOME` properly for `download_root` ([#864](https://github.com/openai/whisper/pull/864))
+
+### Improvements
+- Handle printing even if sys.stdout.buffer is not available ([#887](https://github.com/openai/whisper/pull/887))
+- Use stdout for printing transcription progress ([#867](https://github.com/openai/whisper/pull/867))
+- Print '?' if a letter can't be encoded using the system default encoding ([#859](https://github.com/openai/whisper/pull/859))
+
+---
+
+## [v20230117](https://github.com/openai/whisper/releases/tag/v20230117)
+
+The first versioned release available on [PyPI](https://pypi.org/project/openai-whisper/)

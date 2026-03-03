@@ -1,80 +1,309 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Whisper in minutes
 ---
 
-## Get started in three steps
+This guide will help you transcribe your first audio file using Whisper's command-line interface and Python API.
 
-Get your documentation site running locally and make your first customization.
+## Command-Line Usage
 
-### Step 1: Set up your local environment
+### Basic Transcription
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+The simplest way to use Whisper is via the command line. The `turbo` model is used by default for optimal speed and accuracy:
 
-### Step 2: Deploy your changes
+```bash
+whisper audio.mp3
+```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+You can transcribe multiple files at once:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```bash
+whisper audio.flac audio.mp3 audio.wav --model turbo
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Tip>
+  Whisper supports various audio formats including MP3, WAV, FLAC, M4A, and more through FFmpeg.
+</Tip>
 
-### Step 3: Go live
+### Transcribing Non-English Audio
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+To transcribe audio in a specific language, use the `--language` parameter:
 
-## Next steps
+```bash
+whisper japanese.wav --language Japanese
+```
 
-Now that you have your docs running, explore these key features:
+### Translating to English
 
-<CardGroup cols={2}>
+Whisper can translate speech from any supported language directly into English:
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+```bash
+whisper japanese.wav --model medium --language Japanese --task translate
+```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+<Warning>
+  The `turbo` model is not trained for translation tasks. Use `medium` or `large` models for the best translation results.
+</Warning>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+### Common CLI Options
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+<CodeGroup>
+```bash Specify Model
+whisper audio.mp3 --model medium
+```
 
-</CardGroup>
+```bash Output Format
+whisper audio.mp3 --output_format txt
+```
+
+```bash Custom Output Directory
+whisper audio.mp3 --output_dir ./transcriptions
+```
+
+```bash Verbose Output
+whisper audio.mp3 --verbose True
+```
+</CodeGroup>
+
+View all available options:
+
+```bash
+whisper --help
+```
+
+## Python API
+
+### Basic Transcription
+
+Transcribe audio files programmatically using Whisper's Python API:
+
+```python
+import whisper
+
+# Load the model (downloads on first use)
+model = whisper.load_model("turbo")
+
+# Transcribe audio
+result = model.transcribe("audio.mp3")
+
+# Print the transcribed text
+print(result["text"])
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The `transcribe()` method reads the entire file and processes the audio with a sliding 30-second window, performing autoregressive sequence-to-sequence predictions on each window.
 </Note>
+
+### Choosing a Model
+
+Select different models based on your speed and accuracy requirements:
+
+```python
+import whisper
+
+# Fast and efficient (recommended)
+model = whisper.load_model("turbo")
+
+# Maximum accuracy (requires more VRAM)
+model = whisper.load_model("large")
+
+# Minimal resource usage
+model = whisper.load_model("tiny")
+
+# English-only (better accuracy for English)
+model = whisper.load_model("base.en")
+```
+
+### Checking Available Models
+
+```python
+import whisper
+
+models = whisper.available_models()
+print(models)
+# ['tiny.en', 'tiny', 'base.en', 'base', 'small.en', 'small', 
+#  'medium.en', 'medium', 'large-v1', 'large-v2', 'large-v3', 
+#  'large', 'large-v3-turbo', 'turbo']
+```
+
+### Advanced Usage: Language Detection and Decoding
+
+For lower-level access to the model, use `detect_language()` and `decode()`:
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Load audio and pad/trim it to fit 30 seconds
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# Make log-Mel spectrogram and move to the same device as the model
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+# Detect the spoken language
+_, probs = model.detect_language(mel)
+detected_language = max(probs, key=probs.get)
+print(f"Detected language: {detected_language}")
+
+# Decode the audio
+options = whisper.DecodingOptions()
+result = whisper.decode(model, mel, options)
+
+# Print the recognized text
+print(result.text)
+```
+
+### Device Selection
+
+By default, Whisper uses CUDA if available, otherwise CPU. You can specify the device explicitly:
+
+```python
+import whisper
+import torch
+
+# Explicitly use GPU
+model = whisper.load_model("turbo", device="cuda")
+
+# Explicitly use CPU
+model = whisper.load_model("turbo", device="cpu")
+
+# Check if CUDA is available
+if torch.cuda.is_available():
+    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    model = whisper.load_model("turbo", device="cuda")
+else:
+    print("Using CPU")
+    model = whisper.load_model("turbo", device="cpu")
+```
+
+## Complete Examples
+
+<Steps>
+  <Step title="Transcribe a Podcast Episode">
+    ```python
+    import whisper
+
+    # Load the turbo model for fast transcription
+    model = whisper.load_model("turbo")
+
+    # Transcribe the audio
+    result = model.transcribe(
+        "podcast.mp3",
+        language="en",
+        verbose=True
+    )
+
+    # Save transcription to file
+    with open("transcript.txt", "w", encoding="utf-8") as f:
+        f.write(result["text"])
+
+    print("Transcription saved to transcript.txt")
+    ```
+  </Step>
+
+  <Step title="Translate Foreign Language Audio">
+    ```python
+    import whisper
+
+    # Use medium model for translation
+    model = whisper.load_model("medium")
+
+    # Translate Spanish speech to English text
+    result = model.transcribe(
+        "spanish_audio.mp3",
+        language="Spanish",
+        task="translate"
+    )
+
+    print("English translation:")
+    print(result["text"])
+    ```
+  </Step>
+
+  <Step title="Batch Process Multiple Files">
+    ```python
+    import whisper
+    import os
+
+    model = whisper.load_model("turbo")
+
+    audio_files = ["audio1.mp3", "audio2.mp3", "audio3.mp3"]
+
+    for audio_file in audio_files:
+        print(f"Processing {audio_file}...")
+        result = model.transcribe(audio_file)
+        
+        # Save with same name but .txt extension
+        output_file = os.path.splitext(audio_file)[0] + ".txt"
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(result["text"])
+        
+        print(f"Saved to {output_file}")
+    ```
+  </Step>
+</Steps>
+
+## Output Format
+
+The `transcribe()` method returns a dictionary containing:
+
+- `text`: The full transcribed text
+- `segments`: List of segments with timestamps
+- `language`: Detected or specified language
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+result = model.transcribe("audio.mp3")
+
+# Full text
+print(result["text"])
+
+# Access individual segments with timestamps
+for segment in result["segments"]:
+    start = segment["start"]
+    end = segment["end"]
+    text = segment["text"]
+    print(f"[{start:.2f}s - {end:.2f}s] {text}")
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Choose the Right Model" icon="gauge-high">
+    Use `turbo` for the best balance of speed and accuracy. Use `tiny` or `base` for real-time applications.
+  </Card>
+  
+  <Card title="Use GPU Acceleration" icon="microchip">
+    Ensure PyTorch is installed with CUDA support for 10-20x faster transcription on NVIDIA GPUs.
+  </Card>
+  
+  <Card title="Batch Processing" icon="layer-group">
+    Load the model once and reuse it for multiple files to avoid repeated model loading overhead.
+  </Card>
+  
+  <Card title="English-only Models" icon="language">
+    Use `.en` models (e.g., `base.en`) for better accuracy when transcribing English-only content.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Explore Advanced Features"
+    icon="code"
+  >
+    Learn about word-level timestamps, language detection, and custom decoding options
+  </Card>
+  
+  <Card
+    title="View All Languages"
+    icon="earth-americas"
+  >
+    Check the tokenizer.py file for the complete list of 99+ supported languages
+  </Card>
+</CardGroup>

@@ -1,0 +1,179 @@
+---
+title: Model Card
+description: Detailed information about Whisper models including use cases, training data, limitations, and ethical considerations
+---
+
+## Overview
+
+Whisper is OpenAI's automatic speech recognition (ASR) system trained for speech recognition and translation tasks. It can transcribe speech audio into text in the language it is spoken (ASR) as well as translate it into English (speech translation).
+
+<Info>
+For more information on how these models were trained and evaluated, see [the paper](https://arxiv.org/abs/2212.04356). This model card follows the [Model Cards for Model Reporting](https://arxiv.org/abs/1810.03993) framework.
+</Info>
+
+## Model Details
+
+### Available Models
+
+There are 9 models of different sizes and capabilities:
+
+| Size   | Parameters | English-only | Multilingual |
+|--------|------------|--------------|-------------|
+| tiny   | 39 M       | ✓            | ✓           |
+| base   | 74 M       | ✓            | ✓           |
+| small  | 244 M      | ✓            | ✓           |
+| medium | 769 M      | ✓            | ✓           |
+| large  | 1550 M     |              | ✓           |
+| turbo  | 798 M      |              | ✓           |
+
+### Release Dates
+
+- **September 2022**: Original model series
+- **December 2022**: `large-v2` released with improvements
+- **November 2023**: `large-v3` released
+- **September 2024**: `large-v3-turbo` (turbo model) optimized for inference speed
+
+### Model Type
+
+Sequence-to-sequence Transformer model for:
+- Automatic speech recognition (ASR)
+- Speech translation
+- Spoken language identification
+- Voice activity detection
+
+## Intended Use
+
+### Evaluated Use Cases
+
+The primary intended users of these models are **AI researchers** studying:
+- Robustness and generalization of speech processing systems
+- Model capabilities, biases, and constraints
+- Large-scale weak supervision approaches
+
+Whisper is also useful as an **ASR solution for developers**, especially for English speech recognition.
+
+### Primary Tasks
+
+The models are primarily trained and evaluated on:
+- **ASR**: Transcribing speech in ~10 languages
+- **Speech translation to English**: Translating non-English speech into English text
+
+### Additional Capabilities
+
+Whisper may exhibit additional capabilities, particularly if fine-tuned:
+- Voice activity detection
+- Speaker classification  
+- Speaker diarization
+
+<Warning>
+These additional capabilities have **not been robustly evaluated**. Users should perform thorough evaluations in their specific context and domain before deployment.
+</Warning>
+
+## Appropriate Use
+
+<Check>
+**Recommended uses:**
+- Transcribing and translating speech
+- Improving accessibility tools
+- Research on speech processing robustness
+- Development of near-real-time speech recognition applications
+</Check>
+
+<Warning>
+**Not recommended:**
+- Transcribing recordings without consent
+- Subjective classification or inferring human attributes
+- High-risk decision-making contexts where accuracy flaws lead to pronounced outcome flaws
+- Real-time transcription out of the box (requires additional engineering)
+</Warning>
+
+## Training Data
+
+Whisper models are trained on **680,000 hours** of audio with corresponding transcripts collected from the internet.
+
+### Data Distribution
+
+- **65%** (438,000 hours): English audio + English transcripts
+- **18%** (126,000 hours): Non-English audio + English transcripts (for translation)
+- **17%** (117,000 hours): Non-English audio + native transcripts in **98 different languages**
+
+### Training Methodology
+
+Models are trained using **large-scale weak supervision** on diverse audio data from the internet.
+
+<Note>
+Performance on transcription in a given language is directly correlated with the amount of training data in that language.
+</Note>
+
+## Performance and Limitations
+
+### Strengths
+
+- Improved robustness to accents, background noise, and technical language
+- Zero-shot translation from multiple languages into English
+- Near state-of-the-art accuracy on speech recognition and translation
+
+### Known Limitations
+
+#### Hallucinations
+
+Predictions may include text **not actually spoken** in the audio input. This occurs because models combine:
+- Predicting the next word based on language knowledge
+- Transcribing the actual audio
+
+<Warning>
+Hallucinations may be worse in low-resource and low-discoverability languages.
+</Warning>
+
+#### Uneven Language Performance
+
+- **Lower accuracy** on low-resource languages with less training data
+- **Disparate performance** across different accents and dialects
+- Potential **higher word error rates** across speakers of different genders, races, ages, or demographic groups
+
+#### Repetitive Text Generation
+
+The sequence-to-sequence architecture can generate repetitive text. Mitigation strategies:
+- Beam search
+- Temperature scheduling
+
+<Note>
+These mitigations help but do not perfectly eliminate repetitions.
+</Note>
+
+### Full Evaluation
+
+Complete evaluation results are available in [the accompanying paper](https://arxiv.org/abs/2212.04356).
+
+## Broader Implications
+
+### Beneficial Applications
+
+- **Accessibility**: Improving tools for users with hearing impairments
+- **Near-real-time applications**: Building speech recognition and translation applications
+- **Democratized ASR**: Making speech recognition more accessible to developers
+
+### Potential Concerns
+
+#### Dual-Use Risks
+
+<Warning>
+**Potential misuse:**
+- Building or scaling surveillance technologies
+- Automatic transcription of large volumes of audio communication
+- Individual recognition capabilities present safety concerns
+</Warning>
+
+#### Economic Implications
+
+Disparate performance across languages and demographics may have real economic implications for beneficial applications built on Whisper.
+
+### OpenAI's Assessment
+
+While surveillance risks exist, OpenAI expects that transcription cost is **not the limiting factor** for scaling surveillance projects. The benefits of accessible ASR technology are expected to outweigh the risks.
+
+## Resources
+
+- [Paper](https://arxiv.org/abs/2212.04356)
+- [Blog post](https://openai.com/blog/whisper)
+- [GitHub repository](https://github.com/openai/whisper)

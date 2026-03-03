@@ -1,0 +1,284 @@
+---
+title: 'DecodingResult'
+description: 'Result object containing decoded text and metadata'
+---
+
+## DecodingResult
+
+A frozen dataclass that contains the results of decoding a 30-second audio segment. Returned by the `decode()` function.
+
+```python
+@dataclass(frozen=True)
+class DecodingResult:
+    audio_features: Tensor
+    language: str
+    language_probs: Optional[Dict[str, float]] = None
+    tokens: List[int] = field(default_factory=list)
+    text: str = ""
+    avg_logprob: float = np.nan
+    no_speech_prob: float = np.nan
+    temperature: float = np.nan
+    compression_ratio: float = np.nan
+```
+
+## Fields
+
+### Required Fields
+
+<ParamField path="audio_features" type="torch.Tensor" required>
+  Encoded audio features from the encoder with shape `(n_audio_ctx, n_audio_state)`. These are the internal representations used for decoding.
+</ParamField>
+
+<ParamField path="language" type="str" required>
+  Detected or specified language code (e.g., `"en"`, `"fr"`, `"ja"`)
+</ParamField>
+
+### Optional Fields
+
+<ParamField path="language_probs" type="Optional[Dict[str, float]]" default="None">
+  Probability distribution over all languages. Keys are language codes, values are probabilities. Only populated when language detection is performed.
+</ParamField>
+
+<ParamField path="tokens" type="List[int]" default="[]">
+  List of integer token IDs that were decoded (excluding special tokens like SOT and EOT)
+</ParamField>
+
+<ParamField path="text" type="str" default='""'>
+  Decoded text transcription
+</ParamField>
+
+<ParamField path="avg_logprob" type="float" default="np.nan">
+  Average log probability of the generated tokens. More negative values indicate lower model confidence.
+</ParamField>
+
+<ParamField path="no_speech_prob" type="float" default="np.nan">
+  Probability that the audio segment contains no speech. Values closer to 1.0 indicate the model thinks there's no speech.
+</ParamField>
+
+<ParamField path="temperature" type="float" default="np.nan">
+  Temperature value used for sampling. Will be `0.0` for greedy decoding.
+</ParamField>
+
+<ParamField path="compression_ratio" type="float" default="np.nan">
+  Ratio of text length to token count. Very high values may indicate repetitive or hallucinated output.
+</ParamField>
+
+## Usage Examples
+
+### Basic Decoding
+
+```python
+from whisper import load_model
+from whisper.decoding import decode, DecodingOptions
+from whisper.audio import load_audio, pad_or_trim, log_mel_spectrogram
+
+# Load and process audio
+model = load_model("base")
+audio = load_audio("audio.mp3")
+mel = log_mel_spectrogram(pad_or_trim(audio))
+
+# Decode
+options = DecodingOptions(language="en")
+result = decode(model, mel, options)
+
+# Access results
+print(f"Text: {result.text}")
+print(f"Language: {result.language}")
+print(f"Confidence: {result.avg_logprob}")
+print(f"No speech probability: {result.no_speech_prob}")
+```
+
+### Checking Result Quality
+
+```python
+# Evaluate transcription quality
+if result.no_speech_prob > 0.6:
+    print("Warning: Segment likely contains no speech")
+
+if result.avg_logprob < -1.0:
+    print("Warning: Low confidence transcription")
+
+if result.compression_ratio > 2.4:
+    print("Warning: Possible repetition or hallucination")
+
+if result.compression_ratio < 0.8:
+    print("Warning: Possible truncated or incomplete output")
+```
+
+### Language Detection
+
+```python
+# Detect language automatically
+options = DecodingOptions(task="lang_id")
+result = decode(model, mel, options)
+
+print(f"Detected language: {result.language}")
+
+if result.language_probs:
+    # Show top 5 languages
+    sorted_langs = sorted(
+        result.language_probs.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:5]
+    
+    print("\nTop 5 languages:")
+    for lang, prob in sorted_langs:
+        print(f"  {lang}: {prob:.3f}")
+```
+
+### Batch Processing
+
+```python
+# Process multiple audio segments
+from whisper.audio import load_audio, pad_or_trim, log_mel_spectrogram
+import torch
+
+# Load multiple audio files
+audio_files = ["audio1.mp3", "audio2.mp3", "audio3.mp3"]
+mels = []
+
+for file in audio_files:
+    audio = load_audio(file)
+    mel = log_mel_spectrogram(pad_or_trim(audio))
+    mels.append(mel)
+
+# Stack into batch
+mel_batch = torch.stack(mels)
+
+# Decode batch
+options = DecodingOptions(language="en")
+results = decode(model, mel_batch, options)
+
+# Process results
+for i, result in enumerate(results):
+    print(f"\nFile {i+1}: {audio_files[i]}")
+    print(f"  Text: {result.text}")
+    print(f"  Confidence: {result.avg_logprob:.3f}")
+```
+
+### Filtering Low-Quality Results
+
+```python
+def is_valid_result(result: DecodingResult) -> bool:
+    """Filter out low-quality transcriptions"""
+    # Skip if likely no speech
+    if result.no_speech_prob > 0.6:
+        return False
+    
+    # Skip if very low confidence
+    if result.avg_logprob < -1.5:
+        return False
+    
+    # Skip if compression ratio is abnormal
+    if result.compression_ratio > 2.4 or result.compression_ratio < 0.8:
+        return False
+    
+    return True
+
+# Use filter
+results = decode(model, mel_batch, options)
+valid_results = [r for r in results if is_valid_result(r)]
+print(f"Valid results: {len(valid_results)}/{len(results)}")
+```
+
+### Accessing Token Information
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+result = decode(model, mel, options)
+
+# Get tokenizer
+tokenizer = get_tokenizer(
+    model.is_multilingual,
+    language=result.language
+)
+
+# Show tokens
+print("Tokens:", result.tokens)
+print("Token count:", len(result.tokens))
+
+# Decode individual tokens
+for token_id in result.tokens[:10]:  # First 10 tokens
+    token_text = tokenizer.decode([token_id])
+    print(f"  {token_id}: '{token_text}'")
+```
+
+### Reusing Audio Features
+
+```python
+# Decode with different options using same audio features
+result1 = decode(model, mel, DecodingOptions(temperature=0.0))
+
+# Reuse encoded features for different decoding strategy
+result2 = decode(
+    model,
+    result1.audio_features.unsqueeze(0),  # Already encoded
+    DecodingOptions(temperature=0.2, best_of=3)
+)
+
+print("Greedy:", result1.text)
+print("Sampled:", result2.text)
+```
+
+## Quality Metrics
+
+### avg_logprob
+
+Average log probability indicates model confidence:
+
+- `> -0.5`: Very high confidence
+- `-0.5 to -1.0`: High confidence (typical for clear speech)
+- `-1.0 to -1.5`: Moderate confidence
+- `< -1.5`: Low confidence (may indicate unclear audio or errors)
+
+### no_speech_prob
+
+Probability of no speech in the segment:
+
+- `< 0.3`: Likely contains speech
+- `0.3 to 0.6`: Uncertain
+- `> 0.6`: Likely no speech (silence, music, noise)
+
+### compression_ratio
+
+Ratio of text characters to token count:
+
+- `< 0.8`: Possibly truncated output
+- `0.8 to 2.4`: Normal range
+- `> 2.4`: Possible hallucination or repetition
+- `> 3.0`: Very likely hallucination
+
+## Notes
+
+### When to Use DecodingResult
+
+- **Quality filtering**: Use metrics to filter out poor transcriptions
+- **Language detection**: Check `language_probs` for multi-language content
+- **Debugging**: Inspect `tokens` and `audio_features` for troubleshooting
+- **Confidence scoring**: Use `avg_logprob` to assess transcription reliability
+
+### Batch vs Single Results
+
+The `decode()` function returns:
+- Single `DecodingResult` when input mel has shape `(80, 3000)`
+- `List[DecodingResult]` when input mel has shape `(batch, 80, 3000)`
+
+### Immutability
+
+The dataclass is frozen (immutable). To modify a result, create a new instance:
+
+```python
+from dataclasses import replace
+
+# Create modified copy
+modified_result = replace(result, text=result.text.upper())
+```
+
+### Memory Considerations
+
+The `audio_features` tensor is included in each result. For large batches, consider:
+- Discarding audio features if not needed for further processing
+- Processing audio in smaller batches
+- Using the features for multiple decoding attempts with different options

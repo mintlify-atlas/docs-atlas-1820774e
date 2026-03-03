@@ -1,0 +1,126 @@
+---
+title: 'log_mel_spectrogram'
+description: 'Compute log-Mel spectrogram from audio waveform'
+---
+
+## Function Signature
+
+```python
+log_mel_spectrogram(
+    audio: Union[str, np.ndarray, torch.Tensor],
+    n_mels: int = 80,
+    padding: int = 0,
+    device: Optional[Union[str, torch.device]] = None
+) -> torch.Tensor
+```
+
+Computes the log-Mel spectrogram of audio using Short-Time Fourier Transform (STFT) and Mel filterbanks. This is the core preprocessing step that converts raw audio into the format expected by Whisper's encoder.
+
+## Parameters
+
+<ParamField path="audio" type="Union[str, np.ndarray, torch.Tensor]" required>
+  The input audio. Can be:
+  - A string path to an audio file (will be loaded using `load_audio`)
+  - A NumPy array containing the audio waveform at 16 kHz
+  - A PyTorch Tensor containing the audio waveform at 16 kHz
+</ParamField>
+
+<ParamField path="n_mels" type="int" default="80">
+  The number of Mel-frequency filters to use. Only `80` and `128` are supported. The default `80` matches Whisper's standard configuration.
+</ParamField>
+
+<ParamField path="padding" type="int" default="0">
+  Number of zero samples to pad to the right of the audio waveform.
+</ParamField>
+
+<ParamField path="device" type="Optional[Union[str, torch.device]]" default="None">
+  If specified, the audio tensor is moved to this device before computing the STFT. Use `"cuda"` for GPU acceleration or `"cpu"` for CPU processing.
+</ParamField>
+
+## Returns
+
+<ResponseField name="log_mel_spec" type="torch.Tensor" shape="(n_mels, n_frames)">
+  A Tensor containing the log-Mel spectrogram. Values are normalized to approximately the range [0, 1].
+</ResponseField>
+
+## Example
+
+```python
+import torch
+from whisper.audio import load_audio, log_mel_spectrogram
+
+# Option 1: Directly from file path
+mel = log_mel_spectrogram("speech.mp3")
+print(mel.shape)  # (80, n_frames)
+
+# Option 2: From pre-loaded audio array
+audio = load_audio("speech.wav")
+mel = log_mel_spectrogram(audio, n_mels=80)
+
+# Option 3: Use GPU acceleration
+mel = log_mel_spectrogram(audio, device="cuda")
+
+# Option 4: Use 128 mel filters
+mel = log_mel_spectrogram(audio, n_mels=128)
+
+# Option 5: Add padding
+mel = log_mel_spectrogram(audio, padding=1000)
+```
+
+## Processing Pipeline
+
+The function performs the following steps:
+
+1. **Input Conversion**: If the input is a file path, it loads the audio using `load_audio()`. NumPy arrays are converted to PyTorch tensors.
+
+2. **Device Transfer**: If a device is specified, the audio tensor is moved to that device.
+
+3. **Padding**: If `padding > 0`, zero samples are added to the right.
+
+4. **STFT Computation**: Applies Short-Time Fourier Transform with:
+   - Window: Hann window of size `N_FFT` (400)
+   - Hop length: `HOP_LENGTH` (160 samples)
+   - Returns complex-valued spectrogram
+
+5. **Magnitude Calculation**: Computes squared magnitude of the STFT (power spectrum), excluding the last frequency bin.
+
+6. **Mel Filtering**: Projects the power spectrum onto Mel scale using pre-computed filterbanks.
+
+7. **Log Scaling and Normalization**:
+   - Clamps minimum values to 1e-10 to avoid log(0)
+   - Converts to log10 scale
+   - Applies dynamic range compression (maximum 80 dB range)
+   - Normalizes: `(log_spec + 4.0) / 4.0`
+
+## Audio Constants Used
+
+```python
+SAMPLE_RATE = 16000      # Input audio must be 16 kHz
+N_FFT = 400              # FFT window size (25ms at 16kHz)
+HOP_LENGTH = 160         # Hop length (10ms at 16kHz)
+N_FRAMES = 3000          # Frames in a 30-second chunk
+FRAMES_PER_SECOND = 100  # 10ms per audio frame
+```
+
+## Notes
+
+- The function uses pre-computed Mel filterbanks stored in `mel_filters.npz` to avoid dependency on librosa.
+- The STFT uses a Hann window for smooth frequency resolution.
+- The dynamic range is limited to 80 dB by clamping: `torch.maximum(log_spec, log_spec.max() - 8.0)`
+- The final normalization `(log_spec + 4.0) / 4.0` centers the values around a suitable range for the neural network.
+
+## Integration with Whisper Model
+
+```python
+import whisper
+
+model = whisper.load_model("base")
+
+# The model's transcribe() method uses log_mel_spectrogram internally
+audio = whisper.load_audio("speech.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# This is what happens internally:
+mel = whisper.log_mel_spectrogram(audio).to(model.device)
+result = model.decode(mel)
+```

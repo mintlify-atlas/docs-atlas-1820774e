@@ -1,0 +1,411 @@
+---
+title: 'Language Detection'
+description: 'Automatically detect the spoken language in audio files'
+icon: 'globe'
+---
+
+## Overview
+
+Whisper includes built-in language detection that can identify the spoken language in audio files. This feature analyzes the first 30 seconds of audio and returns probability distributions over all supported languages.
+
+## Automatic Detection
+
+### CLI
+
+By default, Whisper automatically detects the language when not specified:
+
+```bash
+whisper audio.mp3
+```
+
+Output:
+```
+Detecting language using up to the first 30 seconds. Use `--language` to specify the language
+Detected language: Japanese
+[transcription follows...]
+```
+
+To skip detection and improve performance, specify the language:
+
+```bash
+whisper audio.mp3 --language Japanese
+```
+
+### Python API
+
+Omit the `language` parameter for automatic detection:
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Language will be detected automatically
+result = model.transcribe("audio.mp3")
+
+print(f"Detected language: {result['language']}")
+print(f"Transcription: {result['text']}")
+```
+
+## The `detect_language()` Function
+
+For standalone language detection without transcription, use the `detect_language()` function:
+
+### Function Signature
+
+```python
+def detect_language(
+    model: Whisper,
+    mel: Tensor,
+    tokenizer: Tokenizer = None
+) -> Tuple[Tensor, List[dict]]
+```
+
+### Basic Usage
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Load and preprocess audio (first 30 seconds)
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# Generate Mel spectrogram
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+# Detect language
+_, probs = model.detect_language(mel)
+
+print(f"Detected language: {max(probs, key=probs.get)}")
+print(f"\nTop 5 languages:")
+for lang, prob in sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]:
+    print(f"  {lang}: {prob:.2%}")
+```
+
+### Return Values
+
+The function returns:
+1. `language_tokens` - Tensor of most probable language token IDs
+2. `language_probs` - Dictionary mapping language codes to probabilities
+
+```python
+{
+    'en': 0.95,
+    'es': 0.02,
+    'fr': 0.01,
+    'de': 0.01,
+    'ja': 0.005,
+    # ... all 99 languages
+}
+```
+
+## Practical Examples
+
+### 1. Batch Language Detection
+
+```python
+import whisper
+from pathlib import Path
+
+def detect_languages_in_directory(audio_dir: str):
+    model = whisper.load_model("turbo")
+    results = {}
+    
+    for audio_file in Path(audio_dir).glob("*.mp3"):
+        # Load audio
+        audio = whisper.load_audio(str(audio_file))
+        audio = whisper.pad_or_trim(audio)
+        
+        # Generate Mel spectrogram
+        mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels)
+        mel = mel.to(model.device)
+        
+        # Detect language
+        _, probs = model.detect_language(mel)
+        detected = max(probs, key=probs.get)
+        confidence = probs[detected]
+        
+        results[audio_file.name] = {
+            'language': detected,
+            'confidence': confidence
+        }
+        
+        print(f"{audio_file.name}: {detected} ({confidence:.1%})")
+    
+    return results
+
+results = detect_languages_in_directory("./audio_files")
+```
+
+### 2. Language-Specific Routing
+
+```python
+import whisper
+
+def process_by_language(audio_file: str):
+    model = whisper.load_model("turbo")
+    
+    # Detect language first
+    audio = whisper.load_audio(audio_file)
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+    
+    _, probs = model.detect_language(mel)
+    detected_language = max(probs, key=probs.get)
+    
+    # Route based on language
+    if detected_language == 'en':
+        # Use English-specific model for better accuracy
+        model_en = whisper.load_model("medium.en")
+        result = model_en.transcribe(audio_file)
+    elif detected_language in ['zh', 'ja', 'ko']:
+        # Handle Asian languages with specific settings
+        result = model.transcribe(audio_file, language=detected_language)
+    else:
+        # Standard transcription
+        result = model.transcribe(audio_file, language=detected_language)
+    
+    return result
+```
+
+### 3. Confidence Threshold
+
+```python
+import whisper
+
+def transcribe_with_confidence_check(audio_file: str, min_confidence: float = 0.5):
+    model = whisper.load_model("turbo")
+    
+    # Detect language with confidence
+    audio = whisper.load_audio(audio_file)
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+    
+    _, probs = model.detect_language(mel)
+    detected_language = max(probs, key=probs.get)
+    confidence = probs[detected_language]
+    
+    if confidence < min_confidence:
+        # Low confidence - get top candidates
+        top_3 = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:3]
+        print(f"Warning: Low confidence ({confidence:.1%})")
+        print("Top candidates:")
+        for lang, prob in top_3:
+            print(f"  {lang}: {prob:.1%}")
+        
+        # Try transcription with top 2 candidates
+        results = {}
+        for lang, _ in top_3[:2]:
+            result = model.transcribe(audio_file, language=lang)
+            results[lang] = result
+        
+        return results
+    else:
+        print(f"Detected {detected_language} with {confidence:.1%} confidence")
+        return model.transcribe(audio_file, language=detected_language)
+
+result = transcribe_with_confidence_check("unclear_audio.mp3", min_confidence=0.7)
+```
+
+### 4. Multilingual Audio Segmentation
+
+```python
+import whisper
+import numpy as np
+
+def detect_language_segments(audio_file: str, segment_duration: int = 30):
+    """
+    Detect language for each segment of a long audio file.
+    Useful for files with multiple speakers or language switches.
+    """
+    model = whisper.load_model("turbo")
+    
+    # Load full audio
+    audio = whisper.load_audio(audio_file)
+    sample_rate = 16000
+    segment_samples = segment_duration * sample_rate
+    
+    segments = []
+    for i in range(0, len(audio), segment_samples):
+        segment_audio = audio[i:i + segment_samples]
+        
+        if len(segment_audio) < sample_rate:  # Skip very short segments
+            continue
+        
+        # Pad to 30 seconds
+        segment_audio = whisper.pad_or_trim(segment_audio)
+        
+        # Detect language
+        mel = whisper.log_mel_spectrogram(segment_audio, n_mels=model.dims.n_mels)
+        mel = mel.to(model.device)
+        _, probs = model.detect_language(mel)
+        
+        detected = max(probs, key=probs.get)
+        confidence = probs[detected]
+        
+        start_time = i / sample_rate
+        end_time = (i + segment_samples) / sample_rate
+        
+        segments.append({
+            'start': start_time,
+            'end': end_time,
+            'language': detected,
+            'confidence': confidence
+        })
+        
+        print(f"[{start_time:.1f}s - {end_time:.1f}s]: {detected} ({confidence:.1%})")
+    
+    return segments
+
+segments = detect_language_segments("multilingual_conversation.mp3")
+```
+
+### 5. Integration with Transcription
+
+```python
+import whisper
+
+def smart_transcribe(audio_file: str):
+    """
+    Transcribe with automatic language detection and logging.
+    """
+    model = whisper.load_model("turbo")
+    
+    # Enable verbose mode to see language detection
+    result = model.transcribe(audio_file, verbose=True)
+    
+    # The language is automatically detected and included in result
+    detected_language = result['language']
+    
+    print(f"\n=== Transcription Summary ===")
+    print(f"Language: {detected_language}")
+    print(f"Duration: {result['segments'][-1]['end']:.1f}s")
+    print(f"Segments: {len(result['segments'])}")
+    print(f"\nFull text:\n{result['text']}")
+    
+    return result
+
+result = smart_transcribe("unknown_language.mp3")
+```
+
+## Advanced: Language-Specific Tokenizers
+
+Different languages use different tokenizers. Understanding this helps with lower-level API usage:
+
+```python
+import whisper
+from whisper.tokenizer import get_tokenizer
+
+model = whisper.load_model("turbo")
+
+# Get language-specific tokenizer
+tokenizer_en = get_tokenizer(
+    multilingual=model.is_multilingual,
+    num_languages=model.num_languages,
+    language="en",
+    task="transcribe"
+)
+
+tokenizer_ja = get_tokenizer(
+    multilingual=model.is_multilingual,
+    num_languages=model.num_languages,
+    language="ja",
+    task="transcribe"
+)
+
+print(f"English SOT sequence: {tokenizer_en.sot_sequence}")
+print(f"Japanese SOT sequence: {tokenizer_ja.sot_sequence}")
+```
+
+## Supported Languages
+
+Whisper supports 99 languages. Common language codes:
+
+<Tabs>
+  <Tab title="Western European">
+    - `en` - English
+    - `es` - Spanish
+    - `fr` - French
+    - `de` - German
+    - `it` - Italian
+    - `pt` - Portuguese
+  </Tab>
+  
+  <Tab title="Asian">
+    - `zh` - Chinese
+    - `ja` - Japanese
+    - `ko` - Korean
+    - `th` - Thai
+    - `vi` - Vietnamese
+    - `id` - Indonesian
+  </Tab>
+  
+  <Tab title="Eastern European">
+    - `ru` - Russian
+    - `uk` - Ukrainian
+    - `pl` - Polish
+    - `cs` - Czech
+    - `ro` - Romanian
+  </Tab>
+  
+  <Tab title="Middle Eastern">
+    - `ar` - Arabic
+    - `fa` - Persian
+    - `he` - Hebrew
+    - `tr` - Turkish
+  </Tab>
+</Tabs>
+
+For the complete list, see [tokenizer.py](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py).
+
+## Model Requirements
+
+<Warning>
+Language detection only works with **multilingual models**. English-only models (`tiny.en`, `base.en`, `small.en`, `medium.en`) cannot detect languages.
+</Warning>
+
+```python
+import whisper
+
+# This works - multilingual model
+model = whisper.load_model("turbo")
+result = model.transcribe("audio.mp3")  # Language detected
+
+# This doesn't detect language - English-only model
+model_en = whisper.load_model("medium.en")
+result = model_en.transcribe("audio.mp3")  # Always assumes English
+```
+
+## Performance Considerations
+
+### Detection Speed
+
+Language detection analyzes only the first 30 seconds of audio:
+
+```python
+# Detection uses first 30 seconds
+audio = whisper.load_audio("long_file.mp3")
+audio_30s = whisper.pad_or_trim(audio)  # Trim to 30 seconds
+
+# This is fast regardless of file length
+mel = whisper.log_mel_spectrogram(audio_30s, n_mels=model.dims.n_mels)
+_, probs = model.detect_language(mel)
+```
+
+### Skip Detection for Known Languages
+
+If you know the language, skip detection to save time:
+
+```python
+# Slower - detects language
+result = model.transcribe("english_audio.mp3")
+
+# Faster - skips detection
+result = model.transcribe("english_audio.mp3", language="en")
+```
+
+<Tip>
+For batch processing of files in the same language, detect once and reuse the language code for subsequent files.
+</Tip>

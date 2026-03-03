@@ -1,0 +1,296 @@
+---
+title: 'detect_language()'
+description: 'Detect the spoken language in audio'
+---
+
+## Function Signature
+
+```python
+@torch.no_grad()
+def detect_language(
+    model: "Whisper",
+    mel: Tensor,
+    tokenizer: Tokenizer = None
+) -> Tuple[Tensor, List[dict]]
+```
+
+## Parameters
+
+<ParamField path="model" type="Whisper" required>
+  The Whisper model instance returned by `load_model()`.
+  
+  **Must be a multilingual model** (not `.en` variant) that has language tokens.
+</ParamField>
+
+<ParamField path="mel" type="torch.Tensor" required>
+  A tensor containing the Mel spectrogram(s).
+  
+  **Shape**: 
+  - `(80, 3000)` for single audio segment
+  - `(n_audio, 80, 3000)` for batched segments
+  - `(n_audio_ctx, n_audio_state)` for pre-encoded audio features
+  
+  The function automatically handles both raw Mel spectrograms and pre-encoded features.
+</ParamField>
+
+<ParamField path="tokenizer" type="Tokenizer" default="None">
+  Optional tokenizer instance. If not provided, automatically creates one based on the model.
+  
+  The tokenizer must have language tokens enabled (multilingual models only).
+</ParamField>
+
+## Returns
+
+<ResponseField name="language_tokens" type="Tensor">
+  Tensor of shape `(n_audio,)` containing the IDs of the most probable language tokens.
+  
+  If input is a single segment (2D tensor), returns a scalar tensor (0D).
+  
+  These are token IDs that appear after the start-of-transcript token.
+</ResponseField>
+
+<ResponseField name="language_probs" type="List[dict]">
+  List of dictionaries (length `n_audio`) containing the probability distribution over all languages.
+  
+  If input is a single segment, returns a single dict instead of a list.
+  
+  Each dictionary maps language codes to probabilities:
+  ```python
+  {
+    "en": 0.85,
+    "es": 0.10,
+    "fr": 0.03,
+    "de": 0.01,
+    ...
+  }
+  ```
+  
+  Probabilities sum to 1.0 across all ~100 supported languages.
+</ResponseField>
+
+## Example
+
+```python
+import whisper
+import torch
+
+# Load multilingual model
+model = whisper.load_model("base")
+
+# Load and prepare audio
+audio = whisper.load_audio("audio.mp3")
+mel = whisper.log_mel_spectrogram(audio).to(model.device)
+
+# Detect language
+language_token, language_probs = whisper.detect_language(model, mel)
+
+# Get the most probable language
+detected_lang = max(language_probs, key=language_probs.get)
+confidence = language_probs[detected_lang]
+
+print(f"Detected language: {detected_lang}")
+print(f"Confidence: {confidence:.2%}")
+
+# Show top 5 languages
+top_5 = sorted(language_probs.items(), key=lambda x: x[1], reverse=True)[:5]
+print("\nTop 5 languages:")
+for lang, prob in top_5:
+    print(f"  {lang}: {prob:.2%}")
+
+# Batch detection
+mel_batch = torch.stack([mel, mel, mel])  # Shape: (3, 80, 3000)
+language_tokens, language_probs_list = whisper.detect_language(model, mel_batch)
+
+for i, probs in enumerate(language_probs_list):
+    detected = max(probs, key=probs.get)
+    print(f"Audio {i}: {detected} ({probs[detected]:.2%})")
+
+# Use with custom tokenizer
+from whisper import get_tokenizer
+
+tokenizer = get_tokenizer(
+    multilingual=True,
+    num_languages=model.num_languages
+)
+language_token, probs = whisper.detect_language(model, mel, tokenizer)
+
+# Get language name from code
+from whisper.tokenizer import LANGUAGES
+
+detected_lang = max(probs, key=probs.get)
+language_name = LANGUAGES[detected_lang]
+print(f"Detected: {language_name.title()}")  # e.g., "English"
+```
+
+## Notes
+
+### How It Works
+
+1. **Encoder**: Processes the Mel spectrogram to extract audio features
+2. **Single token forward pass**: Uses only the start-of-transcript (SOT) token
+3. **Language token logits**: Extracts logits for all language tokens
+4. **Suppression**: Sets all non-language tokens to `-inf`
+5. **Argmax**: Selects the most probable language token
+6. **Softmax**: Computes probability distribution across languages
+
+This is performed **outside the main decode loop** to avoid interfering with KV-caching.
+
+### Supported Languages
+
+Whisper multilingual models support ~100 languages. Some common ones:
+
+```python
+from whisper.tokenizer import LANGUAGES
+
+print(len(LANGUAGES))  # ~100 languages
+print(list(LANGUAGES.keys())[:10])
+# ['en', 'zh', 'de', 'es', 'ru', 'ko', 'fr', 'ja', 'pt', 'tr']
+```
+
+Full list includes: English, Chinese, Spanish, French, German, Japanese, Korean, Portuguese, Russian, Arabic, Hindi, and many more.
+
+### Model Requirements
+
+**This function only works with multilingual models**:
+
+✅ Compatible:
+- `tiny`, `base`, `small`, `medium`, `large`, `large-v2`, `large-v3`, `turbo`
+
+❌ Not compatible:
+- `tiny.en`, `base.en`, `small.en`, `medium.en`
+
+Attempting to use English-only models raises:
+```python
+ValueError: This model doesn't have language tokens so it can't perform lang id
+```
+
+### When to Use
+
+Use `detect_language()` when:
+- You need to know the language before transcription
+- Processing multilingual audio collections
+- Implementing language routing logic
+- Filtering audio by language
+- Verifying language before translation
+
+For transcription, you typically **don't need to call this directly**:
+```python
+# Language is auto-detected by transcribe() when not specified
+result = whisper.transcribe(model, "audio.mp3")
+print(result["language"])  # Already detected
+```
+
+### Pre-encoded Features
+
+You can pass pre-encoded audio features to skip the encoder:
+
+```python
+# Encode audio once
+audio_features = model.encoder(mel)
+
+# Detect language using cached features (faster)
+language_token, probs = whisper.detect_language(
+    model,
+    audio_features,  # Shape: (1, n_audio_ctx, n_audio_state)
+    tokenizer
+)
+
+# Also use same features for decoding
+from whisper import decode, DecodingOptions
+result = decode(model, audio_features, DecodingOptions(language="en"))
+```
+
+### Confidence Thresholds
+
+Interpret confidence scores:
+
+```python
+lang_token, probs = whisper.detect_language(model, mel)
+detected = max(probs, key=probs.get)
+confidence = probs[detected]
+
+if confidence > 0.9:
+    print("Very confident")
+elif confidence > 0.7:
+    print("Confident")
+elif confidence > 0.5:
+    print("Moderate confidence")
+else:
+    print("Low confidence - audio may be ambiguous")
+```
+
+### Batch Processing
+
+Process multiple audio segments efficiently:
+
+```python
+import torch
+
+# Prepare batch of Mel spectrograms
+mels = []
+for audio_file in audio_files:
+    audio = whisper.load_audio(audio_file)
+    mel = whisper.log_mel_spectrogram(audio)
+    mels.append(mel)
+
+# Stack into batch
+mel_batch = torch.stack(mels).to(model.device)
+
+# Detect languages for all at once
+language_tokens, language_probs = whisper.detect_language(model, mel_batch)
+
+# Process results
+for filename, probs in zip(audio_files, language_probs):
+    detected = max(probs, key=probs.get)
+    print(f"{filename}: {detected} ({probs[detected]:.2%})")
+```
+
+### Language Code Mapping
+
+```python
+from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE
+
+# Convert code to name
+print(LANGUAGES["en"])  # "english"
+print(LANGUAGES["zh"])  # "chinese"
+
+# Convert name to code (accepts various formats)
+print(TO_LANGUAGE_CODE["English"])  # "en"
+print(TO_LANGUAGE_CODE["CHINESE"])  # "zh"
+print(TO_LANGUAGE_CODE["Spanish"])  # "es"
+```
+
+### Integration with Transcription
+
+```python
+import whisper
+
+model = whisper.load_model("base")
+audio = whisper.load_audio("unknown_language.mp3")
+mel = whisper.log_mel_spectrogram(audio).to(model.device)
+
+# Detect language first
+lang_token, probs = whisper.detect_language(model, mel)
+detected = max(probs, key=probs.get)
+
+if detected == "en":
+    # Use English-specific model for better performance
+    model_en = whisper.load_model("base.en")
+    result = model_en.transcribe(audio)
+else:
+    # Use detected language
+    result = model.transcribe(audio, language=detected)
+
+print(result["text"])
+```
+
+### Performance
+
+- **Very fast**: Only one forward pass through encoder and single decoder token
+- **Encoder caching**: Reuse encoded features for both detection and decoding
+- **Batch-friendly**: Process multiple audios in parallel
+- **No KV cache**: Simpler than full decoding
+
+Typical times on GPU:
+- Single segment: ~10-20ms
+- Batch of 10 segments: ~30-50ms

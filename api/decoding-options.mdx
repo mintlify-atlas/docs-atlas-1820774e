@@ -1,0 +1,228 @@
+---
+title: 'DecodingOptions'
+description: 'Configuration options for decoding audio segments'
+---
+
+## DecodingOptions
+
+A frozen dataclass that contains all configuration options for decoding 30-second audio segments. Used by the `decode()` function to control decoding behavior.
+
+```python
+@dataclass(frozen=True)
+class DecodingOptions:
+    task: str = "transcribe"
+    language: Optional[str] = None
+    temperature: float = 0.0
+    sample_len: Optional[int] = None
+    best_of: Optional[int] = None
+    beam_size: Optional[int] = None
+    patience: Optional[float] = None
+    length_penalty: Optional[float] = None
+    prompt: Optional[Union[str, List[int]]] = None
+    prefix: Optional[Union[str, List[int]]] = None
+    suppress_tokens: Optional[Union[str, Iterable[int]]] = "-1"
+    suppress_blank: bool = True
+    without_timestamps: bool = False
+    max_initial_timestamp: Optional[float] = 1.0
+    fp16: bool = True
+```
+
+## Fields
+
+### Task and Language
+
+<ParamField path="task" type="str" default="transcribe">
+  Whether to perform transcription (`"transcribe"`) or translation to English (`"translate"`)
+</ParamField>
+
+<ParamField path="language" type="Optional[str]" default="None">
+  Language code of the audio (e.g., `"en"`, `"fr"`, `"ja"`). If `None`, language is detected automatically.
+</ParamField>
+
+### Sampling Strategy
+
+<ParamField path="temperature" type="float" default="0.0">
+  Sampling temperature. Use `0.0` for greedy decoding (deterministic), or values like `0.2`-`1.0` for stochastic sampling.
+</ParamField>
+
+<ParamField path="sample_len" type="Optional[int]" default="None">
+  Maximum number of tokens to sample. Defaults to `n_text_ctx // 2` if not specified.
+</ParamField>
+
+<ParamField path="best_of" type="Optional[int]" default="None">
+  Number of independent samples to generate when using stochastic sampling (temperature > 0). The best one is selected based on log probability.
+</ParamField>
+
+<ParamField path="beam_size" type="Optional[int]" default="None">
+  Number of beams for beam search when using greedy decoding (temperature = 0). Cannot be used with `best_of`.
+</ParamField>
+
+<ParamField path="patience" type="Optional[float]" default="None">
+  Beam search patience factor as described in [arxiv:2204.05424](https://arxiv.org/abs/2204.05424). Requires `beam_size` to be set.
+</ParamField>
+
+<ParamField path="length_penalty" type="Optional[float]" default="None">
+  "Alpha" parameter for length penalty in Google NMT. Use `None` for simple length normalization. Should be between 0 and 1.
+</ParamField>
+
+### Prompting and Context
+
+<ParamField path="prompt" type="Optional[Union[str, List[int]]]" default="None">
+  Text or token IDs to provide as context from previous audio. Helps with consistency across segments. See [discussion](https://github.com/openai/whisper/discussions/117#discussioncomment-3727051) for details.
+</ParamField>
+
+<ParamField path="prefix" type="Optional[Union[str, List[int]]]" default="None">
+  Text or token IDs to prefix the current segment with. Forces the transcription to start with specific text.
+</ParamField>
+
+### Token Suppression
+
+<ParamField path="suppress_tokens" type="Optional[Union[str, Iterable[int]]]" default="-1">
+  List of token IDs to suppress, or comma-separated string. Use `"-1"` to suppress non-speech tokens as defined in `tokenizer.non_speech_tokens()`.
+</ParamField>
+
+<ParamField path="suppress_blank" type="bool" default="True">
+  Suppress blank outputs at the beginning of sampling
+</ParamField>
+
+### Timestamp Options
+
+<ParamField path="without_timestamps" type="bool" default="False">
+  Use `<|notimestamps|>` token to sample text tokens only, without any timestamp tokens
+</ParamField>
+
+<ParamField path="max_initial_timestamp" type="Optional[float]" default="1.0">
+  Maximum allowed timestamp (in seconds) for the first token. Prevents the model from starting too late in the audio.
+</ParamField>
+
+### Implementation Details
+
+<ParamField path="fp16" type="bool" default="True">
+  Use 16-bit floating point precision for most calculations. Set to `False` if running on CPU or if encountering numerical issues.
+</ParamField>
+
+## Usage Examples
+
+### Basic Transcription
+
+```python
+from whisper import load_model
+from whisper.decoding import DecodingOptions, decode
+from whisper.audio import load_audio, pad_or_trim, log_mel_spectrogram
+
+# Load model and audio
+model = load_model("base")
+audio = load_audio("audio.mp3")
+mel = log_mel_spectrogram(pad_or_trim(audio))
+
+# Default options (greedy decoding)
+options = DecodingOptions()
+result = decode(model, mel, options)
+print(result.text)
+```
+
+### Translation to English
+
+```python
+# Translate foreign language audio to English
+options = DecodingOptions(
+    task="translate",
+    language="ja"  # Japanese audio
+)
+result = decode(model, mel, options)
+print(result.text)  # Output in English
+```
+
+### Beam Search Decoding
+
+```python
+# Use beam search for potentially better results
+options = DecodingOptions(
+    beam_size=5,
+    patience=1.0,
+    length_penalty=0.8
+)
+result = decode(model, mel, options)
+```
+
+### Stochastic Sampling
+
+```python
+# Generate multiple candidates and pick the best
+options = DecodingOptions(
+    temperature=0.2,
+    best_of=5
+)
+result = decode(model, mel, options)
+```
+
+### Using Prompts for Context
+
+```python
+# Provide context from previous segment
+options = DecodingOptions(
+    prompt="The speaker was discussing machine learning concepts.",
+    language="en"
+)
+result = decode(model, mel, options)
+```
+
+### Text-Only Output (No Timestamps)
+
+```python
+# Disable timestamps for plain text
+options = DecodingOptions(
+    without_timestamps=True
+)
+result = decode(model, mel, options)
+```
+
+### Custom Token Suppression
+
+```python
+# Suppress specific tokens
+options = DecodingOptions(
+    suppress_tokens=[1, 2, 7, 8, 9],  # Specific token IDs
+    suppress_blank=True
+)
+result = decode(model, mel, options)
+```
+
+### Using Kwargs Shortcut
+
+```python
+# Pass options as kwargs directly to decode()
+result = decode(
+    model,
+    mel,
+    language="en",
+    task="transcribe",
+    temperature=0.0
+)
+```
+
+## Notes
+
+### When to Use Each Option
+
+- **Greedy decoding** (`temperature=0.0`): Fastest and most deterministic, good for most use cases
+- **Beam search** (`beam_size=5`): Better quality for challenging audio, slower than greedy
+- **Stochastic sampling** (`temperature>0`, `best_of>1`): Useful for creative applications or when you want variation
+
+### Constraints
+
+- Cannot use `beam_size` and `best_of` together
+- `patience` requires `beam_size` to be set
+- `length_penalty` should be between 0 and 1 if specified
+- `best_of` is incompatible with greedy sampling (temperature=0)
+
+### Performance Tips
+
+- Set `fp16=False` when running on CPU for better compatibility
+- Lower `beam_size` for faster decoding at the cost of quality
+- Use `without_timestamps=True` if you don't need timestamp information
+- The dataclass is frozen (immutable) - create a new instance to change options
+
+### Language Codes
+
+Common language codes include: `"en"` (English), `"zh"` (Chinese), `"es"` (Spanish), `"fr"` (French), `"de"` (German), `"ja"` (Japanese), `"ko"` (Korean), `"ru"` (Russian), `"ar"` (Arabic), `"hi"` (Hindi)

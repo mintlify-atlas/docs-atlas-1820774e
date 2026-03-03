@@ -1,0 +1,537 @@
+---
+title: Tokenizer
+description: Tokenization utilities for Whisper models
+---
+
+The tokenizer module provides tools for encoding and decoding text using Whisper's tiktoken-based tokenization system. It supports both multilingual and English-only models with language-specific tokens and special control tokens.
+
+## Tokenizer Class
+
+A thin wrapper around `tiktoken` providing quick access to special tokens and language-specific encoding.
+
+### Initialization
+
+```python
+from whisper.tokenizer import Tokenizer
+import tiktoken
+
+# Typically created via get_tokenizer() function
+tokenizer = Tokenizer(
+    encoding=encoding,
+    num_languages=99,
+    language="en",
+    task="transcribe"
+)
+```
+
+### Parameters
+
+<ParamField path="encoding" type="tiktoken.Encoding" required>
+  The underlying tiktoken encoding instance
+</ParamField>
+
+<ParamField path="num_languages" type="int" required>
+  Number of languages supported by this tokenizer (typically 99)
+</ParamField>
+
+<ParamField path="language" type="str | None" default="None">
+  The language code (e.g., "en", "fr", "es") for this tokenizer instance
+</ParamField>
+
+<ParamField path="task" type="str | None" default="None">
+  The task type: either "transcribe" or "translate"
+</ParamField>
+
+<ParamField path="sot_sequence" type="Tuple[int]" default="()">
+  Start-of-transcript token sequence (automatically generated in __post_init__)
+</ParamField>
+
+<ParamField path="special_tokens" type="Dict[str, int]" default="{}">
+  Dictionary mapping special token strings to their token IDs (automatically populated)
+</ParamField>
+
+### Methods
+
+#### encode()
+
+Encode text into a list of token IDs.
+
+```python
+tokens = tokenizer.encode("Hello, world!")
+print(tokens)  # [15496, 11, 1917, 0]
+```
+
+<ParamField path="text" type="str" required>
+  The text to encode
+</ParamField>
+
+<ParamField path="**kwargs" type="any">
+  Additional keyword arguments passed to the underlying tiktoken encoding
+</ParamField>
+
+<ResponseField name="return" type="List[int]">
+  List of token IDs representing the encoded text
+</ResponseField>
+
+#### decode()
+
+Decode token IDs back into text, filtering out timestamp tokens.
+
+```python
+text = tokenizer.decode([15496, 11, 1917, 0])
+print(text)  # "Hello, world!"
+```
+
+<ParamField path="token_ids" type="List[int]" required>
+  List of token IDs to decode
+</ParamField>
+
+<ParamField path="**kwargs" type="any">
+  Additional keyword arguments passed to the underlying tiktoken decoder
+</ParamField>
+
+<ResponseField name="return" type="str">
+  The decoded text with timestamp tokens filtered out (tokens >= timestamp_begin are removed)
+</ResponseField>
+
+#### decode_with_timestamps()
+
+Decode token IDs including timestamp annotations.
+
+```python
+text = tokenizer.decode_with_timestamps(token_ids)
+# Output: "Hello <|1.08|> world <|2.34|>"
+```
+
+<ParamField path="token_ids" type="List[int]" required>
+  List of token IDs to decode
+</ParamField>
+
+<ParamField path="**kwargs" type="any">
+  Additional keyword arguments passed to the underlying tiktoken decoder
+</ParamField>
+
+<ResponseField name="return" type="str">
+  The decoded text with timestamp tokens annotated as `<|1.08|>` format
+</ResponseField>
+
+#### to_language_token()
+
+Convert a language code to its corresponding token ID.
+
+```python
+token_id = tokenizer.to_language_token("fr")
+print(token_id)  # Token ID for French
+```
+
+<ParamField path="language" type="str" required>
+  Language code (e.g., "en", "fr", "es")
+</ParamField>
+
+<ResponseField name="return" type="int">
+  Token ID corresponding to the language
+</ResponseField>
+
+**Raises:** `KeyError` if the language is not found in the tokenizer.
+
+#### split_to_word_tokens()
+
+Split tokens into word-level tokens based on language-specific rules.
+
+```python
+words, word_tokens = tokenizer.split_to_word_tokens(token_ids)
+```
+
+<ParamField path="tokens" type="List[int]" required>
+  List of token IDs to split
+</ParamField>
+
+<ResponseField name="return" type="Tuple[List[str], List[List[int]]]">
+  A tuple containing:
+  - List of decoded words
+  - List of token ID lists corresponding to each word
+</ResponseField>
+
+**Note:** For languages without spaces (Chinese, Japanese, Thai, Lao, Burmese, Cantonese), uses Unicode-based splitting. For other languages, uses space-based splitting.
+
+### Special Token Properties
+
+All special token properties are cached for performance.
+
+#### eot
+
+```python
+token_id = tokenizer.eot
+```
+
+<ResponseField name="eot" type="int">
+  End-of-transcript token ID
+</ResponseField>
+
+#### sot
+
+```python
+token_id = tokenizer.sot
+```
+
+<ResponseField name="sot" type="int">
+  Start-of-transcript token ID for `<|startoftranscript|>`
+</ResponseField>
+
+#### transcribe
+
+```python
+token_id = tokenizer.transcribe
+```
+
+<ResponseField name="transcribe" type="int">
+  Transcribe task token ID for `<|transcribe|>`
+</ResponseField>
+
+#### translate
+
+```python
+token_id = tokenizer.translate
+```
+
+<ResponseField name="translate" type="int">
+  Translate task token ID for `<|translate|>`
+</ResponseField>
+
+#### sot_lm
+
+```python
+token_id = tokenizer.sot_lm
+```
+
+<ResponseField name="sot_lm" type="int">
+  Start-of-language-model token ID for `<|startoflm|>`
+</ResponseField>
+
+#### sot_prev
+
+```python
+token_id = tokenizer.sot_prev
+```
+
+<ResponseField name="sot_prev" type="int">
+  Start-of-previous token ID for `<|startofprev|>`
+</ResponseField>
+
+#### no_speech
+
+```python
+token_id = tokenizer.no_speech
+```
+
+<ResponseField name="no_speech" type="int">
+  No-speech token ID for `<|nospeech|>`
+</ResponseField>
+
+#### no_timestamps
+
+```python
+token_id = tokenizer.no_timestamps
+```
+
+<ResponseField name="no_timestamps" type="int">
+  No-timestamps token ID for `<|notimestamps|>`
+</ResponseField>
+
+#### timestamp_begin
+
+```python
+token_id = tokenizer.timestamp_begin
+```
+
+<ResponseField name="timestamp_begin" type="int">
+  Token ID for the first timestamp token `<|0.00|>`
+</ResponseField>
+
+#### language_token
+
+```python
+token_id = tokenizer.language_token
+```
+
+<ResponseField name="language_token" type="int">
+  Token ID for the language configured in this tokenizer instance
+</ResponseField>
+
+**Raises:** `ValueError` if no language is configured.
+
+#### all_language_tokens
+
+```python
+tokens = tokenizer.all_language_tokens
+```
+
+<ResponseField name="all_language_tokens" type="Tuple[int]">
+  Tuple of all language token IDs supported by this tokenizer
+</ResponseField>
+
+#### all_language_codes
+
+```python
+codes = tokenizer.all_language_codes
+```
+
+<ResponseField name="all_language_codes" type="Tuple[str]">
+  Tuple of all language codes (e.g., "en", "fr", "es") supported by this tokenizer
+</ResponseField>
+
+#### sot_sequence_including_notimestamps
+
+```python
+sequence = tokenizer.sot_sequence_including_notimestamps
+```
+
+<ResponseField name="sot_sequence_including_notimestamps" type="Tuple[int]">
+  The start-of-transcript sequence with the no-timestamps token appended
+</ResponseField>
+
+#### non_speech_tokens
+
+```python
+tokens = tokenizer.non_speech_tokens
+```
+
+<ResponseField name="non_speech_tokens" type="Tuple[int]">
+  Tuple of token IDs for non-speech annotations (e.g., speaker tags, music symbols) that should be suppressed during generation
+</ResponseField>
+
+Includes tokens for:
+- Music notation: `♪♪♪`
+- Speaker tags: `[DAVID]`
+- Stage directions: `(SPEAKING FOREIGN LANGUAGE)`
+- Various symbols and brackets
+
+## get_tokenizer()
+
+Factory function to create a tokenizer instance for Whisper models.
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+# For multilingual model
+tokenizer = get_tokenizer(
+    multilingual=True,
+    language="en",
+    task="transcribe"
+)
+
+# For English-only model
+tokenizer = get_tokenizer(
+    multilingual=False
+)
+```
+
+### Parameters
+
+<ParamField path="multilingual" type="bool" required>
+  Whether to use the multilingual tokenizer (True) or English-only tokenizer (False)
+</ParamField>
+
+<ParamField path="num_languages" type="int" default="99">
+  Number of languages to support (only relevant for multilingual models)
+</ParamField>
+
+<ParamField path="language" type="str | None" default="None">
+  Language code or name (e.g., "en", "english", "fr", "french"). If multilingual=True and language is None, defaults to "en"
+</ParamField>
+
+<ParamField path="task" type="str | None" default="None">
+  Task type: "transcribe" or "translate". If multilingual=True and task is None, defaults to "transcribe"
+</ParamField>
+
+<ResponseField name="return" type="Tokenizer">
+  Configured tokenizer instance
+</ResponseField>
+
+**Raises:** `ValueError` if an unsupported language is provided.
+
+### Language Code Resolution
+
+The function accepts both language codes and full language names:
+
+```python
+# These are equivalent
+tokenizer1 = get_tokenizer(multilingual=True, language="en")
+tokenizer2 = get_tokenizer(multilingual=True, language="english")
+
+# Language aliases are also supported
+tokenizer3 = get_tokenizer(multilingual=True, language="mandarin")  # -> "zh"
+tokenizer4 = get_tokenizer(multilingual=True, language="castilian")  # -> "es"
+```
+
+## Language Constants
+
+### LANGUAGES
+
+Dictionary mapping language codes to language names.
+
+```python
+from whisper.tokenizer import LANGUAGES
+
+print(LANGUAGES["en"])  # "english"
+print(LANGUAGES["fr"])  # "french"
+print(len(LANGUAGES))   # 99
+```
+
+<ResponseField name="LANGUAGES" type="Dict[str, str]">
+  Dictionary with 99 language code to name mappings
+</ResponseField>
+
+**Supported languages include:**
+- Western European: English, French, German, Spanish, Italian, Portuguese, Dutch, etc.
+- Eastern European: Russian, Polish, Czech, Ukrainian, Romanian, etc.
+- Asian: Chinese, Japanese, Korean, Hindi, Thai, Vietnamese, etc.
+- Middle Eastern: Arabic, Hebrew, Persian, Turkish, Urdu, etc.
+- African: Swahili, Afrikaans, Amharic, Hausa, Yoruba, etc.
+- Others: Latin, Sanskrit, Hawaiian, Maori, etc.
+
+### TO_LANGUAGE_CODE
+
+Dictionary for looking up language codes by name, including aliases.
+
+```python
+from whisper.tokenizer import TO_LANGUAGE_CODE
+
+print(TO_LANGUAGE_CODE["english"])    # "en"
+print(TO_LANGUAGE_CODE["mandarin"])   # "zh"
+print(TO_LANGUAGE_CODE["burmese"])    # "my"
+print(TO_LANGUAGE_CODE["castilian"])  # "es"
+```
+
+<ResponseField name="TO_LANGUAGE_CODE" type="Dict[str, str]">
+  Dictionary mapping language names and aliases to their codes
+</ResponseField>
+
+**Includes aliases such as:**
+- "burmese" → "my"
+- "mandarin" → "zh"
+- "castilian" → "es"
+- "flemish" → "nl"
+- "haitian" → "ht"
+- "moldavian"/"moldovan" → "ro"
+- "sinhalese" → "si"
+
+## Examples
+
+### Basic Transcription Setup
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+# Create tokenizer for English transcription
+tokenizer = get_tokenizer(
+    multilingual=True,
+    language="en",
+    task="transcribe"
+)
+
+# Encode text
+tokens = tokenizer.encode("Hello, how are you?")
+print(f"Tokens: {tokens}")
+
+# Get start-of-transcript sequence
+print(f"SOT sequence: {tokenizer.sot_sequence}")
+print(f"With no_timestamps: {tokenizer.sot_sequence_including_notimestamps}")
+```
+
+### Translation Task
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+# Create tokenizer for French to English translation
+tokenizer = get_tokenizer(
+    multilingual=True,
+    language="fr",
+    task="translate"
+)
+
+print(f"Language token: {tokenizer.language_token}")
+print(f"Task token: {tokenizer.translate}")
+print(f"SOT sequence: {tokenizer.sot_sequence}")
+```
+
+### Working with Special Tokens
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+tokenizer = get_tokenizer(multilingual=True)
+
+# Get all special tokens
+print(f"All special tokens: {tokenizer.special_tokens}")
+
+# Access specific special tokens
+print(f"EOT: {tokenizer.eot}")
+print(f"No speech: {tokenizer.no_speech}")
+print(f"Timestamp begin: {tokenizer.timestamp_begin}")
+
+# Get non-speech tokens for suppression
+suppress_tokens = tokenizer.non_speech_tokens
+print(f"Tokens to suppress: {suppress_tokens[:10]}...")  # First 10
+```
+
+### Decoding with Timestamps
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+tokenizer = get_tokenizer(multilingual=True)
+
+# Token IDs including timestamp tokens
+token_ids = [50364, 2425, 50414, 1917, 50464]
+
+# Decode without timestamps (filters them out)
+text = tokenizer.decode(token_ids)
+print(f"Without timestamps: {text}")
+
+# Decode with timestamp annotations
+text_with_ts = tokenizer.decode_with_timestamps(token_ids)
+print(f"With timestamps: {text_with_ts}")
+```
+
+### Multi-Language Support
+
+```python
+from whisper.tokenizer import get_tokenizer, LANGUAGES, TO_LANGUAGE_CODE
+
+# List all supported languages
+print(f"Total languages: {len(LANGUAGES)}")
+for code, name in list(LANGUAGES.items())[:5]:
+    print(f"  {code}: {name}")
+
+# Get tokenizer for different languages
+for lang_code in ["en", "fr", "es", "ja", "zh"]:
+    tokenizer = get_tokenizer(multilingual=True, language=lang_code)
+    lang_name = LANGUAGES[lang_code]
+    print(f"{lang_name}: token ID = {tokenizer.language_token}")
+
+# Use language aliases
+tokenizer = get_tokenizer(multilingual=True, language="mandarin")
+print(f"Mandarin tokenizer language: {tokenizer.language}")
+```
+
+### Word-Level Tokenization
+
+```python
+from whisper.tokenizer import get_tokenizer
+
+# English (space-separated)
+tokenizer_en = get_tokenizer(multilingual=True, language="en")
+token_ids = tokenizer_en.encode("Hello world")
+words, word_tokens = tokenizer_en.split_to_word_tokens(token_ids)
+print(f"English words: {words}")
+print(f"Word tokens: {word_tokens}")
+
+# Chinese (no spaces)
+tokenizer_zh = get_tokenizer(multilingual=True, language="zh")
+token_ids = tokenizer_zh.encode("你好世界")
+words, word_tokens = tokenizer_zh.split_to_word_tokens(token_ids)
+print(f"Chinese words: {words}")
+print(f"Word tokens: {word_tokens}")
+```

@@ -1,0 +1,312 @@
+---
+title: Supported Languages
+description: Languages supported by Whisper and performance characteristics
+---
+
+Whisper supports transcription and translation for 99 languages. Performance varies significantly across languages based on training data availability and linguistic characteristics.
+
+## Complete Language List
+
+Whisper supports the following 99 languages:
+
+<AccordionGroup>
+  <Accordion title="A-D Languages (24)">
+    - **Afrikaans** (af)
+    - **Albanian** (sq)
+    - **Amharic** (am)
+    - **Arabic** (ar)
+    - **Armenian** (hy)
+    - **Assamese** (as)
+    - **Azerbaijani** (az)
+    - **Bashkir** (ba)
+    - **Basque** (eu)
+    - **Belarusian** (be)
+    - **Bengali** (bn)
+    - **Bosnian** (bs)
+    - **Breton** (br)
+    - **Bulgarian** (bg)
+    - **Cantonese** (yue)
+    - **Catalan** (ca)
+    - **Chinese** (zh)
+    - **Croatian** (hr)
+    - **Czech** (cs)
+    - **Danish** (da)
+  </Accordion>
+  
+  <Accordion title="E-I Languages (18)">
+    - **Dutch** (nl)
+    - **English** (en)
+    - **Estonian** (et)
+    - **Faroese** (fo)
+    - **Finnish** (fi)
+    - **French** (fr)
+    - **Galician** (gl)
+    - **Georgian** (ka)
+    - **German** (de)
+    - **Greek** (el)
+    - **Gujarati** (gu)
+    - **Haitian Creole** (ht)
+    - **Hausa** (ha)
+    - **Hawaiian** (haw)
+    - **Hebrew** (he)
+    - **Hindi** (hi)
+    - **Hungarian** (hu)
+    - **Icelandic** (is)
+    - **Indonesian** (id)
+    - **Italian** (it)
+  </Accordion>
+  
+  <Accordion title="J-M Languages (16)">
+    - **Japanese** (ja)
+    - **Javanese** (jw)
+    - **Kannada** (kn)
+    - **Kazakh** (kk)
+    - **Khmer** (km)
+    - **Korean** (ko)
+    - **Lao** (lo)
+    - **Latin** (la)
+    - **Latvian** (lv)
+    - **Lingala** (ln)
+    - **Lithuanian** (lt)
+    - **Luxembourgish** (lb)
+    - **Macedonian** (mk)
+    - **Malagasy** (mg)
+    - **Malay** (ms)
+    - **Malayalam** (ml)
+    - **Maltese** (mt)
+    - **Marathi** (mr)
+    - **Mongolian** (mn)
+    - **Myanmar** (my)
+    - **Maori** (mi)
+  </Accordion>
+  
+  <Accordion title="N-S Languages (20)">
+    - **Nepali** (ne)
+    - **Norwegian** (no)
+    - **Nynorsk** (nn)
+    - **Occitan** (oc)
+    - **Pashto** (ps)
+    - **Persian** (fa)
+    - **Polish** (pl)
+    - **Portuguese** (pt)
+    - **Punjabi** (pa)
+    - **Romanian** (ro)
+    - **Russian** (ru)
+    - **Sanskrit** (sa)
+    - **Serbian** (sr)
+    - **Shona** (sn)
+    - **Sindhi** (sd)
+    - **Sinhala** (si)
+    - **Slovak** (sk)
+    - **Slovenian** (sl)
+    - **Somali** (so)
+    - **Spanish** (es)
+    - **Sundanese** (su)
+    - **Swahili** (sw)
+    - **Swedish** (sv)
+  </Accordion>
+  
+  <Accordion title="T-Z Languages (21)">
+    - **Tagalog** (tl)
+    - **Tajik** (tg)
+    - **Tamil** (ta)
+    - **Tatar** (tt)
+    - **Telugu** (te)
+    - **Thai** (th)
+    - **Tibetan** (bo)
+    - **Turkish** (tr)
+    - **Turkmen** (tk)
+    - **Ukrainian** (uk)
+    - **Urdu** (ur)
+    - **Uzbek** (uz)
+    - **Vietnamese** (vi)
+    - **Welsh** (cy)
+    - **Yiddish** (yi)
+    - **Yoruba** (yo)
+  </Accordion>
+</AccordionGroup>
+
+## Language Aliases
+
+Some languages can be specified using alternative names:
+
+| Alias | Language Code |
+|:------|:--------------|
+| Burmese | my (Myanmar) |
+| Valencian | ca (Catalan) |
+| Flemish | nl (Dutch) |
+| Haitian | ht (Haitian Creole) |
+| Letzeburgesch | lb (Luxembourgish) |
+| Pushto | ps (Pashto) |
+| Panjabi | pa (Punjabi) |
+| Moldavian / Moldovan | ro (Romanian) |
+| Sinhalese | si (Sinhala) |
+| Castilian | es (Spanish) |
+| Mandarin | zh (Chinese) |
+
+## Performance by Language
+
+Whisper's performance varies widely depending on the language. The figure below shows WER (Word Error Rate) or CER (Character Error Rate, in *italic*) for large-v3 and large-v2 models evaluated on Common Voice 15 and Fleurs datasets.
+
+![WER breakdown by language](https://github.com/openai/whisper/assets/266841/f4619d66-1058-4005-8f67-a9d811b77c62)
+
+<Note>
+Lower WER/CER values indicate better performance. Additional metrics for other models can be found in Appendix D of the [Whisper paper](https://arxiv.org/abs/2212.04356).
+</Note>
+
+## Using Languages
+
+### Specifying Language in Transcription
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Transcribe with language specified
+result = model.transcribe("audio.mp3", language="Japanese")
+print(result["text"])
+```
+
+### Command-line Usage
+
+```bash
+# Transcribe Japanese audio
+whisper japanese.wav --language Japanese
+
+# Can use language codes
+whisper japanese.wav --language ja
+```
+
+### Automatic Language Detection
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Load audio
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# Create mel spectrogram
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+# Detect language
+_, probs = model.detect_language(mel)
+detected_lang = max(probs, key=probs.get)
+print(f"Detected language: {detected_lang}")
+print(f"Confidence: {probs[detected_lang]:.2%}")
+```
+
+### Getting All Language Probabilities
+
+```python
+import whisper
+
+model = whisper.load_model("turbo")
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+_, probs = model.detect_language(mel)
+
+# Show top 5 languages
+top_langs = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]
+for lang, prob in top_langs:
+    print(f"{lang}: {prob:.2%}")
+```
+
+## Translation to English
+
+<Warning>
+Translation is only supported **to English**. The turbo model is not trained for translation.
+</Warning>
+
+### Translating Non-English Speech
+
+```python
+import whisper
+
+# Use medium or large for translation
+model = whisper.load_model("medium")
+
+result = model.transcribe(
+    "japanese.wav",
+    language="Japanese",
+    task="translate"
+)
+print(result["text"])  # English translation
+```
+
+### Command-line Translation
+
+```bash
+# Translate Japanese speech to English
+whisper japanese.wav --model medium --language Japanese --task translate
+```
+
+<Tip>
+For best translation results, use the `medium` or `large` models. The `turbo` model will return the original language even if `--task translate` is specified.
+</Tip>
+
+## Language-Specific Considerations
+
+### Languages Without Spaces
+
+For languages that don't use spaces (Chinese, Japanese, Thai, Lao, Myanmar, Cantonese), the tokenizer uses special word splitting:
+
+```python
+# These languages split on unicode points instead of spaces
+NO_SPACE_LANGS = {"zh", "ja", "th", "lo", "my", "yue"}
+```
+
+### Character-based Metrics
+
+Some languages use Character Error Rate (CER) instead of Word Error Rate (WER) for evaluation:
+
+- Chinese (zh)
+- Japanese (ja)
+- Thai (th)
+- And other languages shown in *italic* in the performance chart
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="High-Resource Languages" icon="chart-line">
+    English, Spanish, French, German, Chinese, and other widely-spoken languages generally have the best performance.
+  </Card>
+  
+  <Card title="Low-Resource Languages" icon="triangle-exclamation">
+    Less common languages may have higher error rates. Consider using larger models for better accuracy.
+  </Card>
+  
+  <Card title="Language Detection" icon="magnifying-glass">
+    If unsure of the language, use automatic detection. It's reliable for most well-represented languages.
+  </Card>
+  
+  <Card title="Model Selection" icon="sliders">
+    Use larger models (medium, large) for better performance on challenging languages or translation tasks.
+  </Card>
+</CardGroup>
+
+## Checking Language Support
+
+```python
+from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE
+
+# Get all supported languages
+print(f"Total languages: {len(LANGUAGES)}")
+
+# Check if a language is supported
+if "ja" in LANGUAGES:
+    print(f"Japanese: {LANGUAGES['ja']}")
+
+# Look up language code by name
+if "french" in TO_LANGUAGE_CODE:
+    print(f"French code: {TO_LANGUAGE_CODE['french']}")
+
+# List all languages
+for code, name in LANGUAGES.items():
+    print(f"{code}: {name}")
+```

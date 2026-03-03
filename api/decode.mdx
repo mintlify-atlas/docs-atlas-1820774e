@@ -1,0 +1,360 @@
+---
+title: 'decode()'
+description: 'Perform decoding of 30-second audio segment(s)'
+---
+
+## Function Signature
+
+```python
+@torch.no_grad()
+def decode(
+    model: "Whisper",
+    mel: Tensor,
+    options: DecodingOptions = DecodingOptions(),
+    **kwargs,
+) -> Union[DecodingResult, List[DecodingResult]]
+```
+
+## Parameters
+
+<ParamField path="model" type="Whisper" required>
+  The Whisper model instance returned by `load_model()`.
+</ParamField>
+
+<ParamField path="mel" type="torch.Tensor" required>
+  A tensor containing the Mel spectrogram(s).
+  
+  **Shape**: `(80, 3000)` for single segment or `(*, 80, 3000)` for batched segments
+  
+  - **80**: Number of mel frequency bins
+  - **3000**: Number of frames (corresponds to 30 seconds of audio)
+  
+  Generate using `whisper.log_mel_spectrogram()`.
+</ParamField>
+
+<ParamField path="options" type="DecodingOptions" default="DecodingOptions()">
+  A dataclass instance containing all decoding options. Can be constructed with specific parameters or modified using `dataclasses.replace()`.
+  
+  See the DecodingOptions section below for all available fields.
+</ParamField>
+
+<ParamField path="kwargs" type="dict">
+  Additional keyword arguments that override fields in the `options` parameter.
+  
+  Example: `decode(model, mel, options, temperature=0.5)` overrides the temperature in options.
+</ParamField>
+
+## DecodingOptions
+
+`DecodingOptions` is a frozen dataclass with the following fields:
+
+<ParamField path="task" type="str" default="transcribe">
+  Either `"transcribe"` (X→X speech recognition) or `"translate"` (X→English translation).
+</ParamField>
+
+<ParamField path="language" type="Optional[str]" default="None">
+  Language code for the audio (e.g., `"en"`, `"fr"`, `"es"`). Uses detected language if `None`.
+</ParamField>
+
+<ParamField path="temperature" type="float" default="0.0">
+  Temperature for sampling:
+  - `0.0`: Greedy decoding (deterministic)
+  - `> 0.0`: Sampling (stochastic)
+</ParamField>
+
+<ParamField path="sample_len" type="Optional[int]" default="None">
+  Maximum number of tokens to sample. Defaults to `model.dims.n_text_ctx // 2` if not specified.
+</ParamField>
+
+<ParamField path="best_of" type="Optional[int]" default="None">
+  Number of independent sample trajectories when `temperature > 0`.
+  
+  The result with highest average log probability is selected.
+</ParamField>
+
+<ParamField path="beam_size" type="Optional[int]" default="None">
+  Number of beams in beam search (only applicable when `temperature == 0`).
+  
+  Typical values: 3-5. Higher values are more accurate but slower.
+</ParamField>
+
+<ParamField path="patience" type="Optional[float]" default="None">
+  Patience value for beam search as described in [arxiv:2204.05424](https://arxiv.org/abs/2204.05424).
+  
+  Default (`1.0`) is equivalent to conventional beam search.
+</ParamField>
+
+<ParamField path="length_penalty" type="Optional[float]" default="None">
+  Token length penalty coefficient (alpha) as in [arxiv:1609.08144](https://arxiv.org/abs/1609.08144).
+  
+  - `None`: Simple length normalization (divide by length)
+  - `0.0 - 1.0`: Google NMT-style length penalty
+  
+  Used when ranking generations to select which to return among beams or best-of-N samples.
+</ParamField>
+
+<ParamField path="prompt" type="Optional[Union[str, List[int]]]" default="None">
+  Text or token IDs to provide as context from previous audio window.
+  
+  See [discussion](https://github.com/openai/whisper/discussions/117#discussioncomment-3727051) for more details.
+</ParamField>
+
+<ParamField path="prefix" type="Optional[Union[str, List[int]]]" default="None">
+  Text or token IDs to prefix the current context with.
+  
+  Forces the model to begin output with specific text.
+</ParamField>
+
+<ParamField path="suppress_tokens" type="Optional[Union[str, Iterable[int]]]" default="-1">
+  List of token IDs (or comma-separated string) to suppress during sampling.
+  
+  - `"-1"`: Suppress most special characters except common punctuation (default)
+  - `""` or `None`: No suppression
+  - Custom: e.g., `"1,2,3"` or `[1, 2, 3]`
+</ParamField>
+
+<ParamField path="suppress_blank" type="bool" default="True">
+  Suppress blank outputs at the beginning of sampling.
+  
+  Prevents the model from generating space or silence tokens first.
+</ParamField>
+
+<ParamField path="without_timestamps" type="bool" default="False">
+  Use `<|notimestamps|>` token to sample text tokens only, without timestamp tokens.
+</ParamField>
+
+<ParamField path="max_initial_timestamp" type="Optional[float]" default="1.0">
+  Maximum allowed timestamp (in seconds) for the first generated timestamp.
+  
+  Prevents the model from skipping too far ahead at the start.
+</ParamField>
+
+<ParamField path="fp16" type="bool" default="True">
+  Use FP16 (half precision) for most calculations.
+  
+  - Significantly faster on CUDA GPUs
+  - Automatically disabled on CPU (FP16 not supported)
+</ParamField>
+
+## Returns
+
+<ResponseField name="result" type="Union[DecodingResult, List[DecodingResult]]">
+  Returns a single `DecodingResult` if input is 2D `(80, 3000)`, or a list of `DecodingResult` if input is batched.
+  
+  <Expandable title="DecodingResult structure">
+    <ResponseField name="audio_features" type="Tensor">
+      Encoded audio features from the encoder.
+    </ResponseField>
+    
+    <ResponseField name="language" type="str">
+      Detected or specified language code.
+    </ResponseField>
+    
+    <ResponseField name="language_probs" type="Optional[Dict[str, float]]">
+      Probability distribution over all languages (only when language detection was performed).
+    </ResponseField>
+    
+    <ResponseField name="tokens" type="List[int]">
+      List of token IDs in the decoded sequence.
+    </ResponseField>
+    
+    <ResponseField name="text" type="str">
+      Decoded text string.
+    </ResponseField>
+    
+    <ResponseField name="avg_logprob" type="float">
+      Average log probability over sampled tokens.
+      
+      Higher values (closer to 0) indicate higher confidence.
+    </ResponseField>
+    
+    <ResponseField name="no_speech_prob" type="float">
+      Probability that the segment contains no speech.
+      
+      Values close to 1.0 indicate silence or non-speech audio.
+    </ResponseField>
+    
+    <ResponseField name="temperature" type="float">
+      Temperature value used for this decoding.
+    </ResponseField>
+    
+    <ResponseField name="compression_ratio" type="float">
+      Gzip compression ratio of the decoded text.
+      
+      High values (>2.4) often indicate repetitive or low-quality output.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```python
+import whisper
+import torch
+from whisper import DecodingOptions
+
+model = whisper.load_model("base")
+
+# Load and prepare audio
+audio = whisper.load_audio("audio.mp3")
+mel = whisper.log_mel_spectrogram(audio).to(model.device)
+
+# Basic decoding with defaults
+result = whisper.decode(model, mel)
+print(result.text)
+print(f"Language: {result.language}")
+print(f"Confidence: {result.avg_logprob}")
+
+# Decoding with custom options
+options = DecodingOptions(
+    language="en",
+    task="transcribe",
+    temperature=0.0,
+    beam_size=5
+)
+result = whisper.decode(model, mel, options)
+
+# Override options using kwargs
+result = whisper.decode(
+    model,
+    mel,
+    options,
+    temperature=0.5,
+    best_of=3
+)
+
+# Translate to English
+result = whisper.decode(
+    model,
+    mel,
+    DecodingOptions(task="translate")
+)
+
+# With prefix to force output start
+result = whisper.decode(
+    model,
+    mel,
+    DecodingOptions(prefix="Hello, ")
+)
+print(result.text)  # Will start with "Hello, "
+
+# Batch decoding
+mel_batch = torch.stack([mel, mel, mel])  # Shape: (3, 80, 3000)
+results = whisper.decode(model, mel_batch)
+for i, result in enumerate(results):
+    print(f"Segment {i}: {result.text}")
+
+# Language detection only
+result = whisper.decode(
+    model,
+    mel,
+    DecodingOptions(task="lang_id")
+)
+print(result.language)
+print(result.language_probs)  # Dict of all language probabilities
+```
+
+## Notes
+
+### Decode vs Transcribe
+
+**`decode()`** is a lower-level function compared to `transcribe()`:
+
+- **decode()**: Works on 30-second Mel spectrogram segments
+- **transcribe()**: Handles full audio files of any length, splits into segments, applies fallback strategies
+
+Use `decode()` when:
+- You need fine-grained control over single segments
+- You're implementing custom audio processing pipelines
+- You want to handle batching manually
+
+Use `transcribe()` when:
+- Processing complete audio files
+- You want automatic handling of long audio
+- You need word-level timestamps and segment management
+
+### Sampling Strategies
+
+**Greedy Decoding** (`temperature=0`):
+```python
+DecodingOptions(temperature=0.0)
+```
+- Deterministic (same input → same output)
+- Fastest
+- Best for most use cases
+
+**Beam Search** (`temperature=0, beam_size>1`):
+```python
+DecodingOptions(temperature=0.0, beam_size=5)
+```
+- More accurate than greedy
+- 5x slower than greedy (with beam_size=5)
+- Good for high-quality transcription
+
+**Sampling** (`temperature>0`):
+```python
+DecodingOptions(temperature=0.8, best_of=5)
+```
+- Non-deterministic
+- More creative/varied outputs
+- Use `best_of` to select best among multiple samples
+
+### KV Cache
+
+`decode()` automatically manages key-value cache for the decoder:
+- First token: Full forward pass
+- Subsequent tokens: Only process new token (much faster)
+- Cache is cleaned up after decoding completes
+- Cache is rearranged for beam search
+
+### Prompt Engineering
+
+**Using prompts for context**:
+```python
+# Provide context from previous segment
+options = DecodingOptions(prompt="...previous transcription...")
+
+# Force specific output format
+options = DecodingOptions(prefix="Speaker 1: ")
+```
+
+The `prompt` field helps maintain consistency across segments by providing the model with context from previous audio.
+
+### Token Suppression
+
+By default, `suppress_tokens="-1"` suppresses:
+- Special tokens (SOT, EOT, etc.)
+- Most non-speech tokens
+- Common punctuation is NOT suppressed
+
+Custom suppression:
+```python
+# Suppress specific tokens
+DecodingOptions(suppress_tokens=[50256, 50257])
+
+# No suppression
+DecodingOptions(suppress_tokens="")
+```
+
+### Performance Tips
+
+1. **Use FP16 on GPU**: ~2x faster with minimal quality loss
+2. **Batch processing**: Process multiple segments in parallel
+3. **Adjust sample_len**: Reduce if you expect short outputs
+4. **Temperature=0**: Fastest, most accurate for clear audio
+5. **Disable beam search**: Use greedy for speed-critical applications
+
+### Error Handling
+
+```python
+try:
+    result = whisper.decode(model, mel, options)
+    if result.no_speech_prob > 0.6:
+        print("Segment appears to be silence")
+    if result.compression_ratio > 2.4:
+        print("Warning: Possibly repetitive output")
+    if result.avg_logprob < -1.0:
+        print("Warning: Low confidence transcription")
+except Exception as e:
+    print(f"Decoding failed: {e}")
+```

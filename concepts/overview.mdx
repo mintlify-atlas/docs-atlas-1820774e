@@ -1,0 +1,103 @@
+---
+title: Overview
+description: Understanding Whisper's approach to speech recognition
+---
+
+Whisper is a general-purpose speech recognition model trained on a large dataset of diverse audio. It's a multitasking model capable of performing multilingual speech recognition, speech translation, spoken language identification, and voice activity detection.
+
+## Transformer Sequence-to-Sequence Approach
+
+![Approach](https://raw.githubusercontent.com/openai/whisper/main/approach.png)
+
+Whisper uses a Transformer sequence-to-sequence model trained on various speech processing tasks. This architecture allows a single model to replace many stages of a traditional speech-processing pipeline.
+
+### Unified Task Representation
+
+All tasks are jointly represented as a sequence of tokens to be predicted by the decoder, including:
+
+- Multilingual speech recognition
+- Speech translation
+- Spoken language identification
+- Voice activity detection
+
+<Info>
+The multitask training format uses a set of special tokens that serve as task specifiers or classification targets, enabling seamless switching between different speech processing tasks.
+</Info>
+
+## Multitask Training
+
+Whisper's training approach combines multiple speech processing tasks into a single model:
+
+<CardGroup cols={2}>
+  <Card title="Speech Recognition" icon="microphone">
+    Transcribe audio to text in the same language
+  </Card>
+  <Card title="Translation" icon="language">
+    Translate foreign language speech to English
+  </Card>
+  <Card title="Language Detection" icon="globe">
+    Identify the spoken language in audio
+  </Card>
+  <Card title="Voice Activity" icon="waveform">
+    Detect when speech is present in audio
+  </Card>
+</CardGroup>
+
+## How It Works
+
+The transcribe() method processes audio using:
+
+1. **30-second sliding window**: Audio is processed in overlapping segments
+2. **Autoregressive predictions**: The model generates text token by token
+3. **Special tokens**: Task-specific tokens guide the model's behavior
+
+<CodeGroup>
+```python Basic Usage
+import whisper
+
+model = whisper.load_model("turbo")
+result = model.transcribe("audio.mp3")
+print(result["text"])
+```
+
+```python With Language Detection
+import whisper
+
+model = whisper.load_model("turbo")
+
+# Load and prepare audio
+audio = whisper.load_audio("audio.mp3")
+audio = whisper.pad_or_trim(audio)
+
+# Create mel spectrogram
+mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+# Detect language
+_, probs = model.detect_language(mel)
+print(f"Detected language: {max(probs, key=probs.get)}")
+```
+</CodeGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Multiple Model Sizes">
+    Six model sizes available, from tiny (39M parameters) to large (1550M parameters), offering different speed and accuracy tradeoffs.
+  </Accordion>
+  
+  <Accordion title="99 Languages Supported">
+    Whisper supports transcription and translation for 99 languages with varying performance levels.
+  </Accordion>
+  
+  <Accordion title="English-Only Models">
+    Specialized English-only variants (`.en` models) for better performance on English audio.
+  </Accordion>
+  
+  <Accordion title="Optimized Turbo Model">
+    The turbo model offers 8x faster transcription with minimal accuracy loss compared to large-v3.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+The turbo model is not trained for translation tasks. Use the multilingual models (tiny, base, small, medium, large) for translation.
+</Note>
