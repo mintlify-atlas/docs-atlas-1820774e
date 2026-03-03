@@ -1,0 +1,114 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Whisper",
+  "projectDescription": "Robust speech recognition and translation via large-scale weak supervision",
+  "theme": "aspen",
+  "primaryColor": "#5B7BE5",
+  "lightColor": "#8BA4F3",
+  "darkColor": "#3D5BB8",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/models",
+              "concepts/languages",
+              "concepts/architecture"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/cli-usage",
+              "guides/python-api",
+              "guides/translation",
+              "guides/word-timestamps",
+              "guides/language-detection"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/performance",
+              "resources/model-card",
+              "resources/troubleshooting",
+              "resources/changelog"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Functions",
+            "pages": [
+              "api/load-model",
+              "api/transcribe",
+              "api/decode",
+              "api/detect-language"
+            ]
+          },
+          {
+            "group": "Audio Processing",
+            "pages": [
+              "api/load-audio",
+              "api/log-mel-spectrogram",
+              "api/pad-or-trim"
+            ]
+          },
+          {
+            "group": "Model Classes",
+            "pages": [
+              "api/whisper-model",
+              "api/decoding-options",
+              "api/decoding-result"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/tokenizer",
+              "api/normalizers"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multilingual speech recognition (99 languages)",
+    "Speech translation to English",
+    "Multiple model sizes (39M to 1550M parameters)",
+    "Language identification",
+    "Word-level timestamps",
+    "Command-line and Python API"
+  ],
+  "publicApiSurface": [
+    "load_model()",
+    "transcribe()",
+    "decode()",
+    "detect_language()",
+    "load_audio()",
+    "log_mel_spectrogram()",
+    "pad_or_trim()",
+    "available_models()",
+    "Whisper (model class)",
+    "DecodingOptions",
+    "DecodingResult",
+    "Tokenizer",
+    "whisper (CLI command)"
+  ]
+}
